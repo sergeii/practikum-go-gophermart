@@ -5,23 +5,16 @@ linters:
     - godot
     - gci
     - funlen
-#    - maligned
     - golint
     - scopelint
-#    - interfacer
     - wrapcheck
     - varnamelen
     - paralleltest
-#    - ireturn
     - gomnd
     - thelper
-#    - tagliatelle
-#    - noctx
     - nlreturn
     - exhaustivestruct
     - wsl
-#    - nestif
-#    - goerr113
 linters-settings:
   cyclop:
     max-complexity: 10

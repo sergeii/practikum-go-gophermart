@@ -18,7 +18,7 @@ import (
 
 func PrepareTestDatabase() (*pgxpool.Pool, func()) {
 	type config struct {
-		DatabaseDSN string `env:"DATABASE_URI" envDefault:"postgres://gophermart@localhost:5432/gophermart"`
+		DatabaseDSN string `env:"DATABASE_URI" envDefault:"postgresql://gophermart@localhost:5432/gophermart"`
 	}
 	cfg := config{}
 	if err := env.Parse(&cfg); err != nil {
