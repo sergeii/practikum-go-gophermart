@@ -14,7 +14,7 @@ import (
 	"github.com/sergeii/practikum-go-gophermart/pkg/http/server"
 )
 
-func reverseSlice[T any](s []T) []T {
+func reverseBytes(s []byte) []byte {
 	i := 0
 	j := len(s) - 1
 	for i < j {
@@ -34,7 +34,7 @@ func TestHTTPServerListenAndServe(t *testing.T) {
 		server.WithHandler(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			rw.WriteHeader(http.StatusTeapot)
-			rw.Write(reverseSlice(body)) // nolint:errcheck
+			rw.Write(reverseBytes(body)) // nolint:errcheck
 		})),
 		server.WithReadySignal(func() {
 			ready <- struct{}{}
