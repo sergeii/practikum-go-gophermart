@@ -37,6 +37,8 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -49,7 +51,7 @@ jobs:
       - name: Run tests with coverage
         run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
         env:
-          DATABASE_URI: "postgresql://postgres:postgres@postgres/gophermart"
+          DATABASE_URI: "postgresql://postgres:postgres@localhost:5432/gophermart"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
