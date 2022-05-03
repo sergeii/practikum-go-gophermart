@@ -9,29 +9,46 @@ import (
 
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/handlers"
+	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/middleware/auth"
+	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/validate"
 )
 
 func New(app *application.App) (*gin.Engine, error) {
-	router := newRouter(app)
-	if err := registerMiddlewares(router); err != nil {
+	router := gin.New()
+	if err := registerMiddlewares(router, app); err != nil {
 		return nil, err
 	}
 	if err := registerValidators(); err != nil {
 		return nil, err
 	}
+	if err := registerRoutes(router, app); err != nil {
+		return nil, err
+	}
 	return router, nil
 }
 
-func newRouter(app *application.App) *gin.Engine {
+func registerRoutes(r *gin.Engine, app *application.App) error {
 	handler := handlers.New(app)
-	router := gin.Default()
-	router.POST("/api/user/register", handler.RegisterUser)
-	router.POST("/api/user/login", handler.LoginUser)
-	return router
+	privateRoutes := r.Group("/", auth.RequireAuthentication)
+	registerPublicRoutes(r, handler)
+	registerPrivateRoutes(privateRoutes, handler)
+	return nil
 }
 
-func registerMiddlewares(router *gin.Engine) error {
+func registerPublicRoutes(r *gin.Engine, h *handlers.Handler) {
+	r.POST("/api/user/register", h.RegisterUser)
+	r.POST("/api/user/login", h.LoginUser)
+}
+
+func registerPrivateRoutes(r *gin.RouterGroup, h *handlers.Handler) {
+	r.POST("/api/user/orders", h.UploadOrder)
+	r.GET("/api/user/orders", h.ListUserOrders)
+}
+
+func registerMiddlewares(router *gin.Engine, app *application.App) error {
 	router.Use(gin.LoggerWithWriter(log.Logger))
+	router.Use(gin.Recovery())
+	router.Use(auth.Authentication(app.Cfg))
 	return nil
 }
 
@@ -43,6 +60,10 @@ func registerValidators() error {
 		{
 			"notblank",
 			validators.NotBlank,
+		},
+		{
+			"luhn",
+			validate.LuhnNumber,
 		},
 	}
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {

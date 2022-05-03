@@ -2,12 +2,14 @@ package application
 
 import (
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
-	"github.com/sergeii/practikum-go-gophermart/internal/domain/user/service"
+	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
+	"github.com/sergeii/practikum-go-gophermart/internal/services/order"
 )
 
 type App struct {
-	UserService *service.Service
-	Cfg         config.Config
+	UserService  account.Service
+	OrderService order.Service
+	Cfg          config.Config
 }
 
 type Option func(a *App)
@@ -22,8 +24,14 @@ func NewApp(cfg config.Config, opts ...Option) *App {
 	return app
 }
 
-func WithUserService(s *service.Service) Option {
+func WithUserService(s account.Service) Option {
 	return func(a *App) {
 		a.UserService = s
+	}
+}
+
+func WithOrderService(s order.Service) Option {
+	return func(a *App) {
+		a.OrderService = s
 	}
 }

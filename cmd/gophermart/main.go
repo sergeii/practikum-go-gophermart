@@ -58,11 +58,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		select {
-		case <-shutdown:
-			log.Info().Msg("Exiting due to shutdown signal")
-			cancel()
-		}
+		<-shutdown
+		log.Info().Msg("Exiting due to shutdown signal")
+		cancel()
 	}()
 
 	svr, err := httpserver.New(

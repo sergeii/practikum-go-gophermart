@@ -1,4 +1,4 @@
-package service
+package account
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/sergeii/practikum-go-gophermart/internal/domain/user/repository"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/pkg/security/hasher"
 )
@@ -18,15 +18,11 @@ var ErrAuthenticateEmptyPassword = errors.New("cannot login with empty password"
 var ErrAuthenticateInvalidCredentials = errors.New("unable to authenticate user with this login/password")
 
 type Service struct {
-	users  repository.Repository
+	users  users.Repository
 	hasher hasher.PasswordHasher
 }
 
 type Option func(s *Service)
-
-func WithBcryptPasswordHasher() Option {
-	return WithPasswordHasher(hasher.NewBcryptPasswordHasher())
-}
 
 func WithPasswordHasher(h hasher.PasswordHasher) Option {
 	return func(s *Service) {
@@ -34,14 +30,18 @@ func WithPasswordHasher(h hasher.PasswordHasher) Option {
 	}
 }
 
-func New(users repository.Repository, opts ...Option) *Service {
-	s := &Service{
+func WithBcryptPasswordHasher() Option {
+	return WithPasswordHasher(hasher.NewBcryptPasswordHasher())
+}
+
+func New(users users.Repository, opts ...Option) Service {
+	s := Service{
 		users: users,
 		// set defaults
 		hasher: hasher.NewNoopPasswordHasher(),
 	}
 	for _, opt := range opts {
-		opt(s)
+		opt(&s)
 	}
 	return s
 }
@@ -49,7 +49,7 @@ func New(users repository.Repository, opts ...Option) *Service {
 // RegisterNewUser attempts to register a new user with the current repository.
 // Before saving the user into the repository, the raw password is hashed using the service configured hasher.
 // The user is therefore saved with their password hashed
-func (s *Service) RegisterNewUser(ctx context.Context, login, password string) (models.User, error) {
+func (s Service) RegisterNewUser(ctx context.Context, login, password string) (models.User, error) {
 	// must not register with empty password
 	if password == "" {
 		return models.User{}, ErrRegisterEmptyPassword
@@ -64,7 +64,7 @@ func (s *Service) RegisterNewUser(ctx context.Context, login, password string) (
 	newUser := models.User{Login: login, Password: hashedPassword}
 	u, err := s.users.Create(ctx, newUser)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserLoginIsOccupied) {
+		if errors.Is(err, users.ErrUserLoginIsOccupied) {
 			return models.User{}, ErrRegisterLoginIsOccupied
 		}
 		return models.User{}, err
@@ -73,7 +73,7 @@ func (s *Service) RegisterNewUser(ctx context.Context, login, password string) (
 }
 
 // Authenticate attempts to log in a user using provided credentials
-func (s *Service) Authenticate(ctx context.Context, login, password string) (models.User, error) {
+func (s Service) Authenticate(ctx context.Context, login, password string) (models.User, error) {
 	// prevent logging in with an empty password
 	if password == "" {
 		return models.User{}, ErrAuthenticateEmptyPassword
@@ -81,7 +81,7 @@ func (s *Service) Authenticate(ctx context.Context, login, password string) (mod
 
 	user, err := s.users.GetByLogin(ctx, login)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFoundInRepo) {
+		if errors.Is(err, users.ErrUserNotFoundInRepo) {
 			return models.User{}, ErrAuthenticateInvalidCredentials
 		}
 		return models.User{}, err

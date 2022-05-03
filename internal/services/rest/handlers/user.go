@@ -3,13 +3,14 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
-	"github.com/sergeii/practikum-go-gophermart/internal/domain/user/service"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
+	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/middleware/auth"
 )
 
@@ -31,9 +32,13 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	u, err := h.app.UserService.RegisterNewUser(c.Request.Context(), json.Login, json.Password)
+	u, err := h.app.UserService.RegisterNewUser(
+		c.Request.Context(),
+		strings.TrimSpace(json.Login),
+		strings.TrimSpace(json.Password),
+	)
 	if err != nil {
-		if errors.Is(err, service.ErrRegisterLoginIsOccupied) {
+		if errors.Is(err, account.ErrRegisterLoginIsOccupied) {
 			log.Debug().
 				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
 				Msg("unable to register user due to conflict")
@@ -77,12 +82,12 @@ func (h *Handler) LoginUser(c *gin.Context) {
 	u, err := h.app.UserService.Authenticate(c.Request.Context(), json.Login, json.Password)
 	if err != nil {
 		switch {
-		case errors.Is(err, service.ErrAuthenticateInvalidCredentials):
+		case errors.Is(err, account.ErrAuthenticateInvalidCredentials):
 			log.Debug().
 				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
 				Msg("unable to login user due to login/password mismatch")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		case errors.Is(err, service.ErrAuthenticateEmptyPassword):
+		case errors.Is(err, account.ErrAuthenticateEmptyPassword):
 			log.Debug().Err(err).Str("path", c.FullPath()).Msg("unable to login user with empty password")
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		default:
@@ -114,10 +119,10 @@ func (h *Handler) setAuthCookie(c *gin.Context, u models.User) error {
 		return err
 	}
 	cookie := http.Cookie{
-		Name:     auth.AuthCookieName,
+		Name:     auth.CookieName,
 		Value:    token,
 		Path:     "/",
-		Expires:  time.Now().Add(auth.AuthCookieAge),
+		Expires:  time.Now().Add(auth.CookieAge),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}

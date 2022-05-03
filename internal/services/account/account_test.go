@@ -1,4 +1,4 @@
-package service_test
+package account_test
 
 import (
 	"context"
@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/sergeii/practikum-go-gophermart/internal/domain/user/repository/db"
-	"github.com/sergeii/practikum-go-gophermart/internal/domain/user/service"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
 	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
+	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
 )
 
 func TestService_RegisterNewUser_OK(t *testing.T) {
@@ -18,7 +18,7 @@ func TestService_RegisterNewUser_OK(t *testing.T) {
 	defer cancel()
 
 	repo := db.New(pgpool)
-	svc := service.New(repo, service.WithBcryptPasswordHasher())
+	svc := account.New(repo, account.WithBcryptPasswordHasher())
 
 	u, err := svc.RegisterNewUser(context.TODO(), "happy_customer", "sup3rS3cr3t")
 	require.NoError(t, err)
@@ -51,19 +51,19 @@ func TestService_RegisterNewUser_Errors(t *testing.T) {
 			"duplicate login",
 			"happy_customer",
 			"secret",
-			service.ErrRegisterLoginIsOccupied,
+			account.ErrRegisterLoginIsOccupied,
 		},
 		{
 			"duplicate login in mixed case",
 			"Happy_Customer",
 			"secret",
-			service.ErrRegisterLoginIsOccupied,
+			account.ErrRegisterLoginIsOccupied,
 		},
 		{
 			"empty passsword",
 			"bar",
 			"",
-			service.ErrRegisterEmptyPassword,
+			account.ErrRegisterEmptyPassword,
 		},
 	}
 	for _, tt := range tests {
@@ -72,7 +72,7 @@ func TestService_RegisterNewUser_Errors(t *testing.T) {
 			defer cancel()
 
 			repo := db.New(pgpool)
-			svc := service.New(repo, service.WithBcryptPasswordHasher())
+			svc := account.New(repo, account.WithBcryptPasswordHasher())
 
 			_, err := svc.RegisterNewUser(context.TODO(), "happy_customer", "sup3rS3cr3t")
 			require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestService_Authenticate_OK(t *testing.T) {
 	defer cancel()
 
 	repo := db.New(pgpool)
-	svc := service.New(repo, service.WithBcryptPasswordHasher())
+	svc := account.New(repo, account.WithBcryptPasswordHasher())
 
 	u1, err := svc.RegisterNewUser(context.TODO(), "happy_customer", "sup3rS3cr3t")
 	require.NoError(t, err)
@@ -129,19 +129,19 @@ func TestService_Authenticate_Errors(t *testing.T) {
 			"unknown user",
 			"unknown",
 			"sup3rS3cr3t",
-			service.ErrAuthenticateInvalidCredentials,
+			account.ErrAuthenticateInvalidCredentials,
 		},
 		{
 			"empty password",
 			"shopper",
 			"",
-			service.ErrAuthenticateEmptyPassword,
+			account.ErrAuthenticateEmptyPassword,
 		},
 		{
 			"invalid password",
 			"shopper",
 			"guessing",
-			service.ErrAuthenticateInvalidCredentials,
+			account.ErrAuthenticateInvalidCredentials,
 		},
 	}
 
@@ -151,7 +151,7 @@ func TestService_Authenticate_Errors(t *testing.T) {
 			defer cancel()
 
 			repo := db.New(pgpool)
-			svc := service.New(repo, service.WithBcryptPasswordHasher())
+			svc := account.New(repo, account.WithBcryptPasswordHasher())
 			r, err := svc.RegisterNewUser(context.TODO(), "shopper", "sup3rS3cr3t")
 			require.NoError(t, err)
 

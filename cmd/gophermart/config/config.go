@@ -18,7 +18,6 @@ type Config struct {
 	ServerWriteTimeout     time.Duration
 	DatabaseDSN            string `env:"DATABASE_URI"`
 	DatabaseConnectTimeout time.Duration
-	DatabaseQueryTimeout   time.Duration
 	AccrualSystemURL       string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 	SecretKeyEncoded       string `env:"SECRET_KEY"`
 	SecretKey              []byte
@@ -51,10 +50,6 @@ func Init() (Config, error) {
 	flag.DurationVar(
 		&cfg.DatabaseConnectTimeout, "database.connect-timeout", time.Second*5,
 		"Database connection timeout",
-	)
-	flag.DurationVar(
-		&cfg.DatabaseQueryTimeout, "database.query-timeout", time.Second*5,
-		"Database query timeout",
 	)
 	flag.StringVar(
 		&cfg.LogLevel, "log.level", "info",

@@ -51,6 +51,7 @@ func TestHTTPServerListenAndServe(t *testing.T) {
 
 	svrAddr := fmt.Sprintf("http://%s", svr.ListenAddr())
 	resp, err := http.Post(svrAddr, "application/octet-stream", strings.NewReader("Hello World!")) // nolint: gosec
+	defer resp.Body.Close()                                                                        // nolint: govet
 	require.NoError(t, err)
 	assert.Equal(t, 418, resp.StatusCode)
 	respBody, _ := io.ReadAll(resp.Body)

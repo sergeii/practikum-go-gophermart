@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sergeii/practikum-go-gophermart/internal/domain/user/repository"
-	"github.com/sergeii/practikum-go-gophermart/internal/domain/user/repository/db"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
 )
@@ -70,7 +70,7 @@ func TestUsersRepository_Create_ErrorOnDuplicate(t *testing.T) {
 
 			u2, err := repo.Create(context.TODO(), models.User{Login: tt.login, Password: "s3cret"})
 			if tt.wantErr {
-				require.ErrorIs(t, err, repository.ErrUserLoginIsOccupied)
+				require.ErrorIs(t, err, users.ErrUserLoginIsOccupied)
 				assert.Equal(t, 0, u2.ID)
 			} else {
 				require.NoError(t, err)
@@ -149,7 +149,7 @@ func TestUsersRepository_GetByID(t *testing.T) {
 	assert.Equal(t, "str0ng", u1.Password)
 
 	u2, err := repo.GetByID(context.TODO(), 999999)
-	require.ErrorIs(t, err, repository.ErrUserNotFoundInRepo)
+	require.ErrorIs(t, err, users.ErrUserNotFoundInRepo)
 	assert.Equal(t, 0, u2.ID)
 	assert.Equal(t, "", u2.Login)
 	assert.Equal(t, "", u2.Password)
@@ -172,7 +172,7 @@ func TestUsersRepository_GetByLogin(t *testing.T) {
 	assert.Equal(t, "str0ng", u1.Password)
 
 	u2, err := repo.GetByLogin(context.TODO(), "unknown")
-	require.ErrorIs(t, err, repository.ErrUserNotFoundInRepo)
+	require.ErrorIs(t, err, users.ErrUserNotFoundInRepo)
 	assert.Equal(t, 0, u2.ID)
 	assert.Equal(t, "", u2.Login)
 	assert.Equal(t, "", u2.Password)
