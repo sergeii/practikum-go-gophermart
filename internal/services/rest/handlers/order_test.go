@@ -67,31 +67,37 @@ func TestHandler_UploadOrder_Validation(t *testing.T) {
 	tests := []struct {
 		name       string
 		number     string
+		want       bool
 		wantStatus int
 	}{
 		{
 			"valid luhn number",
 			"79927398713",
+			true,
 			202,
 		},
 		{
 			"invalid luhn number",
 			"79927398714",
+			false,
 			422,
 		},
 		{
 			"not a numeric number",
 			"foo",
+			false,
 			422,
 		},
 		{
 			"numeric number with mixed letters",
 			"79927398713foo",
+			false,
 			422,
 		},
 		{
 			"empty body",
 			"",
+			false,
 			400,
 		},
 	}
@@ -106,6 +112,12 @@ func TestHandler_UploadOrder_Validation(t *testing.T) {
 				testutils.RequestWithUser(u, app),
 			)
 			defer resp.Body.Close()
+			userOrders, _ := app.OrderService.GetUserOrders(context.TODO(), u.ID)
+			if tt.want {
+				assert.Len(t, userOrders, 1)
+			} else {
+				assert.Len(t, userOrders, 0)
+			}
 			assert.Equal(t, tt.wantStatus, resp.StatusCode)
 		})
 	}
@@ -186,10 +198,13 @@ func TestHandler_UploadOrder_LuhnValidation(t *testing.T) {
 				testutils.RequestWithUser(u, app),
 			)
 			defer resp.Body.Close()
+			userOrders, _ := app.OrderService.GetUserOrders(context.TODO(), u.ID)
 			if tt.want {
 				assert.Equal(t, 202, resp.StatusCode)
+				assert.Len(t, userOrders, 1)
 			} else {
 				assert.Equal(t, 422, resp.StatusCode)
+				assert.Len(t, userOrders, 0)
 			}
 		})
 	}
@@ -227,12 +242,10 @@ func TestHandler_ListUserOrders_OK(t *testing.T) {
 	jsonItems := make([]listOrderItemSchema, 0)
 	json.Unmarshal([]byte(body), &jsonItems) // nolint:errcheck
 	assert.Len(t, jsonItems, 2)
-	numbers := make([]string, 0, 2)
-	for _, item := range jsonItems {
-		assert.Equal(t, "new", item.Status)
-		numbers = append(numbers, item.Number)
-	}
-	assert.EqualValues(t, []string{"4561261212345467", "49927398716"}, numbers)
+	assert.Equal(t, "new", jsonItems[0].Status)
+	assert.Equal(t, "4561261212345467", jsonItems[0].Number)
+	assert.Equal(t, "new", jsonItems[1].Status)
+	assert.Equal(t, "49927398716", jsonItems[1].Number)
 }
 
 func TestHandler_ListUserOrders_NoOrdersForUser(t *testing.T) {

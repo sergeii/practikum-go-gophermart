@@ -34,12 +34,14 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 			Err(err).Str("path", c.FullPath()).
 			Msg("encountered an error while obtaining order number")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	// the order number is passed in body in plaintext
 	orderNumber := strings.TrimSpace(string(body))
 	if orderNumber == "" {
 		log.Debug().Err(err).Str("path", c.FullPath()).Msg("missing order number")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "order number is required"})
+		return
 	}
 	// the order number should be a numeric value
 	// also it should pass luhn validation
@@ -48,6 +50,7 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 			Err(err).Str("path", c.FullPath()).Str("number", orderNumber).
 			Msg("invalid order number format")
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "order number does not conform the format"})
+		return
 	}
 
 	user := c.MustGet(auth.ContextKey).(models.User) // nolint: forcetypeassert

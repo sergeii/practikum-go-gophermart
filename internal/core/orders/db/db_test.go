@@ -105,6 +105,9 @@ func TestRepository_GetListForUser_OK(t *testing.T) {
 		assert.Equal(t, u.ID, o.User.ID)
 		assert.True(t, o.UploadedAt.After(before))
 	}
+	assert.Equal(t, "1234567812345670", userOrders[0].Number)
+	assert.Equal(t, "4561261212345467", userOrders[1].Number)
+	assert.Equal(t, "49927398716", userOrders[2].Number)
 }
 
 func TestRepository_GetListForUser_NoErrorForUnknownUser(t *testing.T) {

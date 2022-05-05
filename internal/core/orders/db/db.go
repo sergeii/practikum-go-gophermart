@@ -77,10 +77,13 @@ func (r Repository) GetByNumber(ctx context.Context, number string) (models.Orde
 	}, nil
 }
 
-// GetListForUser returns a list of orders uploaded by specified user
+// GetListForUser returns a list of orders uploaded by specified user.
+// The orders are sorted from the oldest to the newest
 func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Order, error) {
 	rows, err := r.db.Query(
-		ctx, "SELECT id, uploaded_at, status, number, user_id FROM orders WHERE user_id = $1", userID,
+		ctx,
+		"SELECT id, uploaded_at, status, number, user_id FROM orders WHERE user_id = $1 ORDER BY uploaded_at ASC",
+		userID,
 	)
 	if err != nil {
 		log.Error().Err(err).Int("userID", userID).Msg("failed to query orders for user")

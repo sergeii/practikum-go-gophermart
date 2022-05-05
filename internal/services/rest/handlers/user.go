@@ -43,12 +43,12 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
 				Msg("unable to register user due to conflict")
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-			return
+		} else {
+			log.Error().
+				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
+				Msg("unable to register user due to error")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
-		log.Error().
-			Err(err).Str("path", c.FullPath()).Str("login", json.Login).
-			Msg("unable to register user due to error")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -73,6 +73,7 @@ type LoginUserReq struct {
 
 func (h *Handler) LoginUser(c *gin.Context) {
 	var json LoginUserReq
+
 	if err := c.ShouldBindJSON(&json); err != nil {
 		log.Debug().Err(err).Str("path", c.FullPath()).Msg("unable to parse login request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
