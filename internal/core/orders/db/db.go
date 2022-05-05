@@ -76,3 +76,33 @@ func (r Repository) GetByNumber(ctx context.Context, number string) (models.Orde
 		Status:     status,
 	}, nil
 }
+
+// GetListForUser returns a list of orders uploaded by specified user
+func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Order, error) {
+	rows, err := r.db.Query(
+		ctx, "SELECT id, uploaded_at, status, number, user_id FROM orders WHERE user_id = $1", userID,
+	)
+	if err != nil {
+		log.Error().Err(err).Int("userID", userID).Msg("failed to query orders for user")
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]models.Order, 0)
+	for rows.Next() {
+		item := models.Order{}
+		err = rows.Scan(&item.ID, &item.UploadedAt, &item.Status, &item.Number, &item.User.ID)
+		if err != nil {
+			log.Error().Err(err).Int("userID", userID).Msg("failed to scan order row")
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	err = rows.Err()
+	if err != nil {
+		log.Error().Err(err).Int("userID", userID).Msg("failed to fetch orders for user")
+		return nil, err
+	}
+
+	return items, nil
+}

@@ -13,4 +13,5 @@ var ErrOrderNotFound = errors.New("order not found")
 type Repository interface {
 	Add(context.Context, models.Order) (models.Order, error)
 	GetByNumber(context.Context, string) (models.Order, error)
+	GetListForUser(context.Context, int) ([]models.Order, error)
 }

@@ -37,3 +37,7 @@ func (s Service) UploadOrder(ctx context.Context, user models.User, number strin
 	}
 	return addedOrder, nil
 }
+
+func (s Service) GetUserOrders(ctx context.Context, userID int) ([]models.Order, error) {
+	return s.orders.GetListForUser(ctx, userID)
+}

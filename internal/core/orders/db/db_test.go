@@ -80,3 +80,39 @@ func TestOrdersRepository_Add_ErrorOnInvalidStatus(t *testing.T) {
 	require.ErrorContains(t, err, "invalid input value for enum order_status")
 	assert.Equal(t, 0, o.ID)
 }
+
+func TestRepository_GetListForUser_OK(t *testing.T) {
+	pgpool, cancel := testutils.PrepareTestDatabase()
+	defer cancel()
+
+	before := time.Now()
+
+	users := udb.New(pgpool)
+	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	require.NoError(t, err)
+
+	repo := odb.New(pgpool)
+	for _, number := range []string{"1234567812345670", "4561261212345467", "49927398716"} {
+		_, err = repo.Add(context.TODO(), models.NewOrder(u, number))
+		require.NoError(t, err)
+	}
+
+	userOrders, err := repo.GetListForUser(context.TODO(), u.ID)
+	require.NoError(t, err)
+	assert.Len(t, userOrders, 3)
+	for _, o := range userOrders {
+		assert.Equal(t, models.OrderStatusNew, o.Status)
+		assert.Equal(t, u.ID, o.User.ID)
+		assert.True(t, o.UploadedAt.After(before))
+	}
+}
+
+func TestRepository_GetListForUser_NoErrorForUnknownUser(t *testing.T) {
+	pgpool, cancel := testutils.PrepareTestDatabase()
+	defer cancel()
+
+	repo := odb.New(pgpool)
+	userOrders, err := repo.GetListForUser(context.TODO(), 9999999)
+	require.NoError(t, err)
+	assert.Len(t, userOrders, 0)
+}

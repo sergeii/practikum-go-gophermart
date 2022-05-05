@@ -75,8 +75,33 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"result": result})
 }
 
+type ListOrderRespItem struct {
+	Number     string             `json:"number"`
+	Status     models.OrderStatus `json:"status"`
+	UploadedAt time.Time          `json:"uploaded_at"` // nolint: tagliatelle
+}
+
 func (h *Handler) ListUserOrders(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "pong",
-	})
+	user := c.MustGet(auth.ContextKey).(models.User) // nolint: forcetypeassert
+	orders, err := h.app.OrderService.GetUserOrders(c.Request.Context(), user.ID)
+	if err != nil {
+		log.Warn().
+			Err(err).Str("path", c.FullPath()).Int("userID", user.ID).
+			Msg("unable to fetch orders for user")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if len(orders) == 0 {
+		c.Status(http.StatusNoContent)
+		return
+	}
+	jsonItems := make([]ListOrderRespItem, 0, len(orders))
+	for _, o := range orders {
+		jsonItems = append(jsonItems, ListOrderRespItem{
+			o.Number,
+			o.Status,
+			o.UploadedAt,
+		})
+	}
+	c.JSON(http.StatusOK, jsonItems)
 }
