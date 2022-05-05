@@ -48,7 +48,7 @@ func TestHandler_UploadOrder_OK(t *testing.T) {
 	assert.Equal(t, 202, resp.StatusCode)
 	var respJSON uploadOrderRespSchema
 	json.Unmarshal([]byte(respBody), &respJSON) // nolint:errcheck
-	assert.Equal(t, "new", respJSON.Result.Status)
+	assert.Equal(t, "NEW", respJSON.Result.Status)
 	assert.Equal(t, "1234567812345670", respJSON.Result.Number)
 	assert.True(t, respJSON.Result.UploadedAt.After(before))
 	assert.True(t, respJSON.Result.UploadedAt.Before(time.Now()))
@@ -242,9 +242,9 @@ func TestHandler_ListUserOrders_OK(t *testing.T) {
 	jsonItems := make([]listOrderItemSchema, 0)
 	json.Unmarshal([]byte(body), &jsonItems) // nolint:errcheck
 	assert.Len(t, jsonItems, 2)
-	assert.Equal(t, "new", jsonItems[0].Status)
+	assert.Equal(t, "NEW", jsonItems[0].Status)
 	assert.Equal(t, "4561261212345467", jsonItems[0].Number)
-	assert.Equal(t, "new", jsonItems[1].Status)
+	assert.Equal(t, "NEW", jsonItems[1].Status)
 	assert.Equal(t, "49927398716", jsonItems[1].Number)
 }
 
