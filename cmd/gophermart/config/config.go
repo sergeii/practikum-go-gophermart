@@ -18,7 +18,8 @@ type Config struct {
 	ServerWriteTimeout     time.Duration
 	DatabaseDSN            string `env:"DATABASE_URI"`
 	DatabaseConnectTimeout time.Duration
-	AccrualSystemURL       string `env:"ACCRUAL_SYSTEM_ADDRESS"`
+	AccrualSystemURL       string `env:"ACCRUAL_SYSTEM_ADDRESS" envDefault:"http://localhost:8081"`
+	AccrualQueueSize       int
 	SecretKeyEncoded       string `env:"SECRET_KEY"`
 	SecretKey              []byte
 	LogLevel               string
@@ -59,6 +60,10 @@ func Init() (Config, error) {
 	flag.StringVar(
 		&cfg.LogOutput, "log.output", "console",
 		"Output format of log messages. Available options: console, stdout, json",
+	)
+	flag.IntVar(
+		&cfg.AccrualQueueSize, "accrual.queue-size", 100,
+		"Maximum size of the accrual processing queue",
 	)
 
 	flag.Parse()

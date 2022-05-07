@@ -6,24 +6,28 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	appcfg "github.com/sergeii/practikum-go-gophermart/cmd/gophermart/application"
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
-	orders "github.com/sergeii/practikum-go-gophermart/internal/core/orders/db"
-	users "github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/order"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/rest"
 )
 
-func PrepareTestServer() (*httptest.Server, *application.App, func()) {
-	cfg := config.Config{}
+type TestServerOpt func(*config.Config)
+
+func PrepareTestServer(opts ...TestServerOpt) (*httptest.Server, *application.App, func()) {
+	cfg := config.Config{
+		AccrualSystemURL: "http://localhost:8081",
+		AccrualQueueSize: 10,
+	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
 	crand.Read(cfg.SecretKey) // nolint: errcheck
 	db, cancelDatabase := PrepareTestDatabase()
-	app := application.NewApp(
-		cfg,
-		application.WithUserService(account.New(users.New(db), account.WithBcryptPasswordHasher())),
-		application.WithOrderService(order.New(orders.New(db))),
-	)
+	app, err := appcfg.Configure(cfg, db)
+	if err != nil {
+		panic(err)
+	}
 	gin.SetMode(gin.ReleaseMode) // prevent gin from overwriting middlewares
 	router, err := rest.New(app)
 	if err != nil {

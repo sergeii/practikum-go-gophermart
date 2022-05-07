@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
 	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
@@ -51,13 +52,13 @@ func TestService_RegisterNewUser_Errors(t *testing.T) {
 			"duplicate login",
 			"happy_customer",
 			"secret",
-			account.ErrRegisterLoginIsOccupied,
+			users.ErrUserLoginIsOccupied,
 		},
 		{
 			"duplicate login in mixed case",
 			"Happy_Customer",
 			"secret",
-			account.ErrRegisterLoginIsOccupied,
+			users.ErrUserLoginIsOccupied,
 		},
 		{
 			"empty passsword",

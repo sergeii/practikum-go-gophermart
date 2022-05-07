@@ -12,7 +12,6 @@ import (
 )
 
 var ErrRegisterEmptyPassword = errors.New("cannot register with empty password")
-var ErrRegisterLoginIsOccupied = errors.New("cannot register with occupied login")
 
 var ErrAuthenticateEmptyPassword = errors.New("cannot login with empty password")
 var ErrAuthenticateInvalidCredentials = errors.New("unable to authenticate user with this login/password")
@@ -65,7 +64,7 @@ func (s Service) RegisterNewUser(ctx context.Context, login, password string) (m
 	u, err := s.users.Create(ctx, newUser)
 	if err != nil {
 		if errors.Is(err, users.ErrUserLoginIsOccupied) {
-			return models.User{}, ErrRegisterLoginIsOccupied
+			return models.User{}, err
 		}
 		return models.User{}, err
 	}

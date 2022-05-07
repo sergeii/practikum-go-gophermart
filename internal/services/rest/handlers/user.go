@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/middleware/auth"
@@ -38,7 +39,7 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 		strings.TrimSpace(json.Password),
 	)
 	if err != nil {
-		if errors.Is(err, account.ErrRegisterLoginIsOccupied) {
+		if errors.Is(err, users.ErrUserLoginIsOccupied) {
 			log.Debug().
 				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
 				Msg("unable to register user due to conflict")

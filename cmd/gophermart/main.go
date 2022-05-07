@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/rs/zerolog/log"
@@ -12,8 +13,8 @@ import (
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/database"
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/logging"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/rest"
-	httpserver "github.com/sergeii/practikum-go-gophermart/pkg/http/server"
+	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/server/processing"
+	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/server/restapi"
 	"github.com/sergeii/practikum-go-gophermart/pkg/random"
 )
 
@@ -50,32 +51,27 @@ func main() {
 		log.Panic().Err(err).Msg("Unable to configure application")
 	}
 
-	router, err := rest.New(app)
-	if err != nil {
-		log.Panic().Err(err).Msg("Unable to configure rest router")
-	}
+	wg := &sync.WaitGroup{}
+	failure := make(chan error, 2)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		<-shutdown
-		log.Info().Msg("Exiting due to shutdown signal")
-		cancel()
+		select {
+		case err := <-failure:
+			log.Warn().Err(err).Msg("Exiting due to failure")
+			cancel()
+		case <-shutdown:
+			log.Info().Msg("Exiting due to shutdown signal")
+			cancel()
+		}
 	}()
 
-	svr, err := httpserver.New(
-		cfg.ServerListenAddr,
-		httpserver.WithShutdownTimeout(cfg.ServerShutdownTimeout),
-		httpserver.WithReadTimeout(cfg.ServerReadTimeout),
-		httpserver.WithWriteTimeout(cfg.ServerWriteTimeout),
-		httpserver.WithHandler(router),
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to setup HTTP server")
-		return
-	}
-	if err = svr.ListenAndServe(ctx); err != nil {
-		log.Error().Err(err).Msg("HTTP server exited prematurely")
-		return
-	}
+	wg.Add(1)
+	go restapi.Run(ctx, app, wg, failure)
+
+	wg.Add(1)
+	go processing.Run(ctx, app, wg, failure)
+
+	wg.Wait()
 }

@@ -16,12 +16,13 @@ type Order struct {
 	User       User
 	Number     string
 	Status     OrderStatus
+	Accrual    float64
 	UploadedAt time.Time
 }
 
-func NewOrder(owner User, number string) Order {
+func NewOrder(number string, userID int) Order {
 	return Order{
-		User:       owner,
+		User:       User{ID: userID},
 		Number:     number,
 		Status:     OrderStatusNew,
 		UploadedAt: time.Now(),

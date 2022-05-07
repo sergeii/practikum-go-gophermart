@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/rs/zerolog/log"
 
+	"github.com/sergeii/practikum-go-gophermart/internal/core/queue"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/order"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/middleware/auth"
@@ -54,7 +55,7 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 	}
 
 	user := c.MustGet(auth.ContextKey).(models.User) // nolint: forcetypeassert
-	o, err := h.app.OrderService.UploadOrder(c.Request.Context(), user, orderNumber)
+	o, err := h.app.ProcessingService.SubmitNewOrder(c.Request.Context(), orderNumber, user.ID)
 	if err != nil {
 		log.Warn().
 			Err(err).Str("path", c.FullPath()).Str("number", orderNumber).
@@ -64,6 +65,8 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "order has already been uploaded by another user"})
 		case errors.Is(err, order.ErrOrderAlreadyUploaded):
 			c.Status(http.StatusOK)
+		case errors.Is(err, queue.ErrQueueIsFull):
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}

@@ -24,7 +24,7 @@ func New(pgpool *pgxpool.Pool) Repository {
 // Add attempts to insert a new order.
 // A new order cannot be added in case of another order having the same number.
 // In that case an error is returned
-func (r Repository) Add(ctx context.Context, o models.Order) (models.Order, error) {
+func (r Repository) Add(ctx context.Context, o models.Order, action func(models.Order) error) (models.Order, error) {
 	var exists bool
 	err := r.db.
 		QueryRow(ctx, "SELECT EXISTS(SELECT id FROM orders WHERE number=$1)", o.Number).
@@ -36,12 +36,19 @@ func (r Repository) Add(ctx context.Context, o models.Order) (models.Order, erro
 		return models.Order{}, orders.ErrOrderAlreadyExists
 	}
 
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return models.Order{}, err
+	}
+	defer tx.Rollback(ctx) // nolint: errcheck
+
 	var newOrderID int
-	err = r.db.
+	err = tx.
 		QueryRow(
 			ctx,
-			"INSERT INTO orders (uploaded_at, user_id, number, status) values ($1, $2, $3, $4) RETURNING id",
-			o.UploadedAt, o.User.ID, o.Number, o.Status,
+			"INSERT INTO orders (uploaded_at, user_id, number, status, accrual) "+
+				"VALUES ($1, $2, $3, $4, $5) RETURNING id",
+			o.UploadedAt, o.User.ID, o.Number, o.Status, o.Accrual,
 		).
 		Scan(&newOrderID)
 	if err != nil {
@@ -49,7 +56,22 @@ func (r Repository) Add(ctx context.Context, o models.Order) (models.Order, erro
 		return models.Order{}, err
 	}
 	o.ID = newOrderID
-	log.Debug().Str("number", o.Number).Int("ID", newOrderID).Msg("added new order")
+	log.Debug().
+		Str("number", o.Number).Int("ID", newOrderID).
+		Msg("added new order")
+
+	if err = action(o); err != nil {
+		if errRollback := tx.Rollback(ctx); errRollback != nil {
+			return models.Order{}, errRollback
+		}
+		return models.Order{}, err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return models.Order{}, err
+	}
+
 	return o, nil
 }
 
@@ -58,14 +80,19 @@ func (r Repository) GetByNumber(ctx context.Context, number string) (models.Orde
 	var orderID, userID int
 	var status models.OrderStatus
 	var uploadedAt time.Time
+	var accrual float64
 
-	row := r.db.QueryRow(ctx, "SELECT id, user_id, uploaded_at, status FROM orders WHERE number = $1", number)
-	if err := row.Scan(&orderID, &userID, &uploadedAt, &status); err != nil {
+	row := r.db.QueryRow(
+		ctx,
+		"SELECT id, user_id, uploaded_at, status, accrual FROM orders WHERE number = $1",
+		number,
+	)
+	if err := row.Scan(&orderID, &userID, &uploadedAt, &status, &accrual); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Debug().Str("number", number).Msg("order not found")
+			log.Debug().Str("number", number).Msg("Order not found in database")
 			return models.Order{}, orders.ErrOrderNotFound
 		}
-		log.Error().Err(err).Str("number", number).Msg("failed to retrieve order by ID")
+		log.Error().Err(err).Str("number", number).Msg("Failed to retrieve order from database by ID")
 		return models.Order{}, err
 	}
 
@@ -74,6 +101,7 @@ func (r Repository) GetByNumber(ctx context.Context, number string) (models.Orde
 		User:       models.User{ID: userID},
 		UploadedAt: uploadedAt,
 		Status:     status,
+		Accrual:    accrual,
 	}, nil
 }
 
@@ -82,7 +110,8 @@ func (r Repository) GetByNumber(ctx context.Context, number string) (models.Orde
 func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Order, error) {
 	rows, err := r.db.Query(
 		ctx,
-		"SELECT id, uploaded_at, status, number, user_id FROM orders WHERE user_id = $1 ORDER BY uploaded_at ASC",
+		"SELECT id, uploaded_at, status, accrual, number, user_id FROM orders "+
+			"WHERE user_id = $1 ORDER BY uploaded_at ASC",
 		userID,
 	)
 	if err != nil {
@@ -94,7 +123,7 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Or
 	items := make([]models.Order, 0)
 	for rows.Next() {
 		item := models.Order{}
-		err = rows.Scan(&item.ID, &item.UploadedAt, &item.Status, &item.Number, &item.User.ID)
+		err = rows.Scan(&item.ID, &item.UploadedAt, &item.Status, &item.Accrual, &item.Number, &item.User.ID)
 		if err != nil {
 			log.Error().Err(err).Int("userID", userID).Msg("failed to scan order row")
 			return nil, err
@@ -108,4 +137,33 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Or
 	}
 
 	return items, nil
+}
+
+func (r Repository) UpdateStatus(ctx context.Context, orderID int, status models.OrderStatus, accrual float64) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) // nolint: errcheck
+
+	// ensure that we update the order exclusively
+	if _, err = tx.Exec(ctx, "SELECT 1 FROM orders WHERE id = $1 FOR UPDATE", orderID); err != nil {
+		log.Error().Err(err).Int("orderID", orderID).Msg("Unable to acquire row lock for order")
+		return err
+	}
+
+	if _, err = tx.Exec(
+		ctx,
+		"UPDATE orders SET status = $1, accrual = $2 WHERE id = $3",
+		status, accrual, orderID,
+	); err != nil {
+		return err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
