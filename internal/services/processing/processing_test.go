@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,7 +39,7 @@ func TestService_SubmitNewOrder_OK(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, o1.ID > 0)
 	assert.Equal(t, "1234567812345670", o1.Number)
-	assert.True(t, o1.UploadedAt.After(before))
+	assert.True(t, !o1.UploadedAt.Before(before))
 	assert.Equal(t, u.ID, o1.User.ID)
 	qLen, _ := ps.QueueLength(context.TODO())
 	assert.Equal(t, 1, qLen)
@@ -88,14 +89,14 @@ func TestService_ProcessNextOrder_Loop(t *testing.T) {
 	responses := map[string]resp{
 		"1234567812345670": {
 			code: 200,
-			body: testutils.MustJSONMarshal(
-				accrual.OrderStatus{Number: "79927398713", Status: "PROCESSED", Accrual: 100.5},
-			),
+			body: testutils.MustJSONMarshal(accrual.OrderStatus{
+				Number: "79927398713", Status: "PROCESSED", Accrual: decimal.RequireFromString("100.5"),
+			}),
 		},
 		"4561261212345467": {
 			code: 200,
 			body: testutils.MustJSONMarshal(
-				accrual.OrderStatus{Number: "79927398713", Status: "INVALID", Accrual: 10},
+				accrual.OrderStatus{Number: "79927398713", Status: "INVALID", Accrual: decimal.NewFromInt(10)},
 			),
 		},
 		"49927398716": {
@@ -156,17 +157,17 @@ func TestService_ProcessNextOrder_Loop(t *testing.T) {
 
 	o1, _ := orders.GetByNumber(context.TODO(), "1234567812345670")
 	assert.Equal(t, models.OrderStatusProcessed, o1.Status)
-	assert.Equal(t, 100.5, o1.Accrual)
+	assert.Equal(t, "100.5", o1.Accrual.String())
 	assert.Equal(t, user1.ID, o1.User.ID)
 
 	o2, _ := orders.GetByNumber(context.TODO(), "4561261212345467")
 	assert.Equal(t, models.OrderStatusInvalid, o2.Status)
-	assert.Equal(t, 0.0, o2.Accrual)
+	assert.Equal(t, decimal.Zero.String(), o2.Accrual.String())
 	assert.Equal(t, user2.ID, o2.User.ID)
 
 	o3, _ := orders.GetByNumber(context.TODO(), "49927398716")
 	assert.Equal(t, models.OrderStatusInvalid, o3.Status)
-	assert.Equal(t, 0.0, o3.Accrual)
+	assert.Equal(t, decimal.Zero.String(), o3.Accrual.String())
 	assert.Equal(t, user1.ID, o3.User.ID)
 
 	_, err = orders.GetByNumber(context.TODO(), "100000000008")
@@ -183,7 +184,10 @@ func TestService_ProcessNextOrder_Retry(t *testing.T) {
 	r.GET("/api/orders/:order", func(c *gin.Context) {
 		retry++
 		if retry == 3 {
-			c.JSON(200, accrual.OrderStatus{Number: "79927398713", Status: "PROCESSED", Accrual: 100.5})
+			c.JSON(200, accrual.OrderStatus{
+				Number: "79927398713", Status: "PROCESSED",
+				Accrual: decimal.RequireFromString("100.5"),
+			})
 			close(done)
 		} else {
 			c.Header("Retry-After", "1")
@@ -229,7 +233,7 @@ func TestService_ProcessNextOrder_Retry(t *testing.T) {
 
 	o, _ := orders.GetByNumber(context.TODO(), "79927398713")
 	assert.Equal(t, models.OrderStatusProcessed, o.Status)
-	assert.Equal(t, 100.5, o.Accrual)
+	assert.Equal(t, "100.5", o.Accrual.String())
 	assert.Equal(t, u.ID, o.User.ID)
 
 	qLen, _ = ps.QueueLength(context.TODO())

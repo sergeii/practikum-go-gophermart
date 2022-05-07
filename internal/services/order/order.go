@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/rs/zerolog/log"
+	"github.com/shopspring/decimal"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
@@ -25,10 +27,10 @@ func (s Service) UploadOrder(
 	ctx context.Context,
 	number string,
 	userID int,
-	extraAction func(models.Order) error,
+	next func(models.Order, pgx.Tx) error,
 ) (models.Order, error) {
-	newOrder := models.NewOrder(number, userID)
-	addedOrder, err := s.orders.Add(ctx, newOrder, extraAction)
+	newOrder := models.NewCandidateOrder(number, userID)
+	addedOrder, err := s.orders.Add(ctx, newOrder, next)
 	// check whether the order has been uploaded by the same user or not
 	if err != nil && errors.Is(err, orders.ErrOrderAlreadyExists) {
 		dupOrder, getErr := s.orders.GetByNumber(ctx, number)
@@ -46,8 +48,7 @@ func (s Service) UploadOrder(
 }
 
 func (s Service) UpdateOrder(
-	ctx context.Context, orderNumber string,
-	newStatus models.OrderStatus, accrual float64,
+	ctx context.Context, orderNumber string, newStatus models.OrderStatus, accrual decimal.Decimal,
 ) error {
 	o, err := s.orders.GetByNumber(ctx, orderNumber)
 	if err != nil {
@@ -65,7 +66,7 @@ func (s Service) UpdateOrder(
 			Int("ID", o.ID).
 			Str("number", orderNumber).
 			Str("status", string(newStatus)).
-			Float64("accrual", accrual).
+			Stringer("accrual", accrual).
 			Msg("Failed to update order status")
 		return err
 	}

@@ -84,6 +84,7 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 type ListOrderRespItem struct {
 	Number     string             `json:"number"`
 	Status     models.OrderStatus `json:"status"`
+	Accrual    float64            `json:"accrual"`
 	UploadedAt time.Time          `json:"uploaded_at"` // nolint: tagliatelle
 }
 
@@ -103,9 +104,11 @@ func (h *Handler) ListUserOrders(c *gin.Context) {
 	}
 	jsonItems := make([]ListOrderRespItem, 0, len(orders))
 	for _, o := range orders {
+		accrualForDisplay, _ := o.Accrual.Float64()
 		jsonItems = append(jsonItems, ListOrderRespItem{
 			o.Number,
 			o.Status,
+			accrualForDisplay,
 			o.UploadedAt,
 		})
 	}

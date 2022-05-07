@@ -8,6 +8,8 @@ import (
 	"strconv"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/rs/zerolog/log"
+	"github.com/shopspring/decimal"
 )
 
 type Service struct {
@@ -15,9 +17,9 @@ type Service struct {
 }
 
 type OrderStatus struct {
-	Number  string  `json:"order"`
-	Status  string  `json:"status"`
-	Accrual float64 `json:"accrual"`
+	Number  string          `json:"order"`
+	Status  string          `json:"status"`
+	Accrual decimal.Decimal `json:"accrual"`
 }
 
 func New(address string) (Service, error) {
@@ -51,8 +53,9 @@ func (s Service) CheckOrder(number string) (OrderStatus, error) {
 		return OrderStatus{}, NewErrTooManyRequests(uint(retryAfter))
 	case http.StatusOK:
 		var os OrderStatus
-		if jsonErr := json.Unmarshal(resp.Body(), &os); err != nil {
-			return OrderStatus{}, jsonErr
+		if jsonErr := json.Unmarshal(resp.Body(), &os); jsonErr != nil {
+			log.Warn().Err(jsonErr).Str("order", number).Msg("Unable to parse json response for 200 OK")
+			return OrderStatus{}, ErrRespInvalidData
 		}
 		return os, nil
 	default:

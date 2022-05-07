@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
+	"github.com/sergeii/practikum-go-gophermart/internal/models"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
 )
@@ -33,6 +35,7 @@ type uploadOrderErrorSchema struct {
 type listOrderItemSchema struct {
 	Status     string    `json:"status"`
 	Number     string    `json:"number"`
+	Accrual    float64   `json:"accrual"`
 	UploadedAt time.Time `json:"uploaded_at"` // nolint: tagliatelle
 }
 
@@ -296,6 +299,11 @@ func TestHandler_ListUserOrders_OK(t *testing.T) {
 	u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
 	app.OrderService.UploadOrder(context.TODO(), "4561261212345467", u.ID, orders.AddNoop) // nolint:errcheck
 	app.OrderService.UploadOrder(context.TODO(), "49927398716", u.ID, orders.AddNoop)      // nolint:errcheck
+	app.OrderService.UpdateOrder(                                                          // nolint:errcheck
+		context.TODO(), "49927398716",
+		models.OrderStatusProcessed, decimal.RequireFromString("10.1"),
+	)
+
 	resp, body := testutils.DoTestRequest(
 		t, ts, http.MethodGet, "/api/user/orders", nil,
 		testutils.RequestWithUser(u, app),
@@ -308,8 +316,10 @@ func TestHandler_ListUserOrders_OK(t *testing.T) {
 	assert.Len(t, jsonItems, 2)
 	assert.Equal(t, "NEW", jsonItems[0].Status)
 	assert.Equal(t, "4561261212345467", jsonItems[0].Number)
-	assert.Equal(t, "NEW", jsonItems[1].Status)
+	assert.Equal(t, 0.0, jsonItems[0].Accrual)
+	assert.Equal(t, "PROCESSED", jsonItems[1].Status)
 	assert.Equal(t, "49927398716", jsonItems[1].Number)
+	assert.Equal(t, 10.1, jsonItems[1].Accrual)
 }
 
 func TestHandler_ListUserOrders_NoOrdersForUser(t *testing.T) {

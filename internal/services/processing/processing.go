@@ -5,7 +5,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/rs/zerolog/log"
+	"github.com/shopspring/decimal"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/queue"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/queue/memory"
@@ -75,7 +77,7 @@ func (s *Service) QueueLength(ctx context.Context) (int, error) {
 func (s *Service) SubmitNewOrder(ctx context.Context, orderNumber string, userID int) (models.Order, error) {
 	return s.OrderService.UploadOrder(
 		ctx, orderNumber, userID,
-		func(o models.Order) error {
+		func(o models.Order, _ pgx.Tx) error {
 			return s.queue.Push(ctx, o.Number)
 		},
 	)
@@ -128,7 +130,8 @@ func (s *Service) handleProcessingError(ctx context.Context, err error, orderNum
 	if errors.Is(err, accrual.ErrOrderNotFound) {
 		log.Warn().Str("order", orderNumber).Msg("Order could not be found in accrual system")
 		// We mark it invalid and never return to this order again, unless there is a problem saving the status
-		if updErr := s.OrderService.UpdateOrder(ctx, orderNumber, models.OrderStatusInvalid, 0); updErr != nil {
+		updErr := s.OrderService.UpdateOrder(ctx, orderNumber, models.OrderStatusInvalid, decimal.NewFromInt(0))
+		if updErr != nil {
 			log.Error().
 				Err(updErr).Str("order", orderNumber).
 				Msgf("Failed to mark unknown order invalid")
@@ -152,11 +155,12 @@ func (s *Service) handleProcessingResult(ctx context.Context, orderNumber string
 	switch os.Status {
 	case "INVALID":
 		logOrderStatus.Msg("Order is not eligible for accrual")
-		if err := s.OrderService.UpdateOrder(ctx, orderNumber, models.OrderStatusInvalid, 0); err != nil {
+		err := s.OrderService.UpdateOrder(ctx, orderNumber, models.OrderStatusInvalid, decimal.NewFromInt(0))
+		if err != nil {
 			return err
 		}
 	case "PROCESSED":
-		logOrderStatus.Float64("points", os.Accrual).Msg("Points accrued for order")
+		logOrderStatus.Stringer("points", os.Accrual).Msg("Points accrued for order")
 		if err := s.OrderService.UpdateOrder(ctx, orderNumber, models.OrderStatusProcessed, os.Accrual); err != nil {
 			return err
 		}

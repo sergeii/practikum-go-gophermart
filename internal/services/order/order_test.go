@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -32,7 +33,7 @@ func TestService_UploadOrder_OK(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, o.ID > 0)
 	assert.Equal(t, "1234567812345670", o.Number)
-	assert.True(t, o.UploadedAt.After(before))
+	assert.True(t, !o.UploadedAt.Before(before))
 	assert.Equal(t, u.ID, o.User.ID)
 }
 
@@ -73,14 +74,17 @@ func TestService_UpdateOrder_OK(t *testing.T) {
 	o, err := svc.UploadOrder(context.TODO(), "1234567812345670", u.ID, orepo.AddNoop)
 	require.NoError(t, err)
 	assert.Equal(t, models.OrderStatusNew, o.Status)
-	assert.Equal(t, 0.0, o.Accrual)
+	assert.True(t, decimal.Zero.Equal(o.Accrual))
 
-	err = svc.UpdateOrder(context.TODO(), "1234567812345670", models.OrderStatusProcessed, 100.5)
+	err = svc.UpdateOrder(
+		context.TODO(), "1234567812345670",
+		models.OrderStatusProcessed, decimal.RequireFromString("100.5"),
+	)
 	require.NoError(t, err)
 
 	upd, _ := orders.GetByNumber(context.TODO(), "1234567812345670")
 	assert.Equal(t, models.OrderStatusProcessed, upd.Status)
-	assert.Equal(t, 100.5, upd.Accrual)
+	assert.Equal(t, "100.5", upd.Accrual.String())
 }
 
 func TestService_UpdateOrder_NotFound(t *testing.T) {
@@ -89,7 +93,10 @@ func TestService_UpdateOrder_NotFound(t *testing.T) {
 
 	orders := odb.New(pgpool)
 	svc := order.New(orders)
-	err := svc.UpdateOrder(context.TODO(), "1234567812345670", models.OrderStatusProcessed, 100.5)
+	err := svc.UpdateOrder(
+		context.TODO(), "1234567812345670",
+		models.OrderStatusProcessed, decimal.RequireFromString("100.5"),
+	)
 	assert.ErrorIs(t, err, orepo.ErrOrderNotFound)
 }
 
@@ -97,25 +104,25 @@ func TestService_UpdateOrder_ConstraintErrors(t *testing.T) {
 	tests := []struct {
 		name    string
 		status  models.OrderStatus
-		accrual float64
+		accrual decimal.Decimal
 		wantErr bool
 	}{
 		{
 			"positive case",
 			models.OrderStatusProcessed,
-			100,
+			decimal.NewFromInt(100),
 			false,
 		},
 		{
 			"invalid order status",
 			models.OrderStatus("foo"),
-			100,
+			decimal.NewFromInt(100),
 			true,
 		},
 		{
 			"negative accrual value",
 			models.OrderStatusProcessed,
-			-100,
+			decimal.NewFromInt(-100),
 			true,
 		},
 	}
@@ -139,11 +146,11 @@ func TestService_UpdateOrder_ConstraintErrors(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Equal(t, models.OrderStatusNew, upd.Status)
-				assert.Equal(t, 0.0, upd.Accrual)
+				assert.True(t, upd.Accrual.IsZero())
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.status, upd.Status)
-				assert.Equal(t, tt.accrual, upd.Accrual)
+				assert.Equal(t, tt.accrual.String(), upd.Accrual.String())
 			}
 		})
 	}

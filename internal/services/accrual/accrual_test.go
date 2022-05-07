@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,9 +24,9 @@ func TestService_CheckOrder(t *testing.T) {
 		{
 			"positive case",
 			200,
-			testutils.MustJSONMarshal(
-				accrual.OrderStatus{Number: "79927398713", Status: "PROCESSED", Accrual: 100.5},
-			),
+			testutils.MustJSONMarshal(accrual.OrderStatus{
+				Number: "79927398713", Status: "PROCESSED", Accrual: decimal.RequireFromString("100.5"),
+			}),
 			"PROCESSED",
 			nil,
 		},
@@ -33,7 +34,7 @@ func TestService_CheckOrder(t *testing.T) {
 			"another positive case",
 			200,
 			testutils.MustJSONMarshal(
-				accrual.OrderStatus{Number: "79927398713", Status: "INVALID", Accrual: 0},
+				accrual.OrderStatus{Number: "79927398713", Status: "INVALID", Accrual: decimal.Zero},
 			),
 			"INVALID",
 			nil,
@@ -51,6 +52,13 @@ func TestService_CheckOrder(t *testing.T) {
 			nil,
 			"",
 			accrual.ErrRespInvalidWaitTime,
+		},
+		{
+			"unexpected body",
+			200,
+			nil,
+			"",
+			accrual.ErrRespInvalidData,
 		},
 		{
 			"unexpected status",
@@ -71,8 +79,9 @@ func TestService_CheckOrder(t *testing.T) {
 			require.NoError(t, err)
 			os, err := service.CheckOrder("79927398713")
 			if tt.wantErr != nil {
-				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Error(t, err, tt.wantErr)
 			} else {
+				assert.NoError(t, err)
 				assert.Equal(t, tt.wantStatus, os.Status)
 			}
 		})
