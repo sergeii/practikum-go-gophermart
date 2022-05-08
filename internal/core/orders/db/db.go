@@ -63,14 +63,14 @@ func (r Repository) Add(ctx context.Context, co models.Order) (models.Order, err
 		Scan(&newOrderID, &actualUploadedAt)
 
 	if err != nil {
-		log.Error().Err(err).Msg("failed to add order")
+		log.Error().Err(err).Msg("Failed to add order")
 		return models.Order{}, err
 	}
 
 	order := models.NewAcceptedOrder(newOrderID, co.Number, co.User.ID, co.Status, co.Accrual, actualUploadedAt)
 	log.Debug().
 		Str("number", order.Number).Int("ID", newOrderID).
-		Msg("added new order")
+		Msg("Added new order")
 
 	return order, nil
 }
@@ -98,7 +98,6 @@ func (r Repository) GetByNumber(ctx context.Context, number string) (models.Orde
 // GetListForUser returns a list of orders uploaded by specified user.
 // The orders are sorted from the oldest to the newest
 func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Order, error) {
-	var row orderRow
 	rows, err := r.db.ExecContext(ctx).Query(
 		ctx,
 		"SELECT id, uploaded_at, status, accrual, number, user_id FROM orders "+
@@ -113,6 +112,7 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Or
 
 	items := make([]models.Order, 0)
 	for rows.Next() {
+		row := orderRow{}
 		err = rows.Scan(&row.ID, &row.UploadedAt, &row.Status, &row.Accrual, &row.Number, &row.UserID)
 		if err != nil {
 			log.Error().Err(err).Int("userID", userID).Msg("failed to scan order row")
@@ -138,12 +138,12 @@ func (r Repository) UpdateStatus(
 	return r.db.WithTransaction(ctx, func(txCtx context.Context) error {
 		tx := r.db.ExecContext(txCtx)
 		// ensure that we update the order exclusively
-		if _, err := tx.Exec(ctx, "SELECT 1 FROM orders WHERE id = $1 FOR UPDATE NOWAIT", orderID); err != nil {
+		if _, err := tx.Exec(txCtx, "SELECT 1 FROM orders WHERE id = $1 FOR UPDATE NOWAIT", orderID); err != nil {
 			log.Error().Err(err).Int("orderID", orderID).Msg("Unable to acquire row lock for order")
 			return err
 		}
 		_, err := tx.Exec(
-			ctx,
+			txCtx,
 			"UPDATE orders SET status = $1, accrual = $2 WHERE id = $3",
 			status, accrual, orderID,
 		)

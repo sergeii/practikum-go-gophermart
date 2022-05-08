@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -46,7 +45,6 @@ func TestHandler_RegisterUser_OK(t *testing.T) {
 
 	reqBody, _ := json.Marshal(&registerUserReqSchema{Login: "happy_shopper", Password: "secret"}) // nolint:errchkjson
 	resp, respBody := testutils.DoTestRequest(t, ts, http.MethodPost, "/api/user/register", bytes.NewReader(reqBody))
-	defer resp.Body.Close()
 	var respJSON registerUserRespSchema
 	json.Unmarshal([]byte(respBody), &respJSON) // nolint:errcheck
 	assert.Equal(t, 200, resp.StatusCode)
@@ -147,7 +145,6 @@ func TestHandler_RegisterUser_Validation(t *testing.T) {
 			resp, respBody := testutils.DoTestRequest(
 				t, ts, http.MethodPost, "/api/user/register", bytes.NewReader(reqBody),
 			)
-			defer resp.Body.Close()
 			if tt.wantSuccess {
 				assert.Equal(t, 200, resp.StatusCode)
 				var respJSON registerUserRespSchema
@@ -182,7 +179,6 @@ func TestHandler_LoginUser_OK(t *testing.T) {
 
 	reqBody, _ := json.Marshal(&loginUserReqSchema{Login: "happy_shopper", Password: "super_secret"}) // nolint:errchkjson
 	resp, _ := testutils.DoTestRequest(t, ts, http.MethodPost, "/api/user/login", bytes.NewReader(reqBody))
-	defer resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 
 	cookie := parseAuthSetCookie(resp)
@@ -279,7 +275,6 @@ func TestHandler_LoginUser_Validation(t *testing.T) {
 
 			reqBody, _ := json.Marshal(&loginUserReqSchema{Login: tt.login, Password: tt.password}) // nolint:errchkjson
 			resp, respBody := testutils.DoTestRequest(t, ts, http.MethodPost, "/api/user/login", bytes.NewReader(reqBody))
-			defer resp.Body.Close()
 			if tt.wantSuccess {
 				assert.Equal(t, 200, resp.StatusCode)
 				cookie := parseAuthSetCookie(resp)
@@ -292,69 +287,4 @@ func TestHandler_LoginUser_Validation(t *testing.T) {
 			}
 		})
 	}
-}
-
-type showBalanceRespSchema struct {
-	Current   float64 `json:"current"`
-	Withdrawn float64 `json:"withdrawn"`
-}
-
-func TestHandler_ShowUserBalance_OK(t *testing.T) {
-	tests := []struct {
-		name      string
-		current   string
-		withdrawn string
-	}{
-		{
-			"zero points of each",
-			"0",
-			"0",
-		},
-		{
-			"have current but no withdrawn",
-			"100500.1",
-			"0",
-		},
-		{
-			"have a bit of both",
-			"2048.1",
-			"2022.91",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ts, app, cancel := testutils.PrepareTestServer()
-			defer cancel()
-
-			current := decimal.RequireFromString(tt.current)
-			withdrawn := decimal.RequireFromString(tt.withdrawn)
-			currentF64, _ := current.Float64()
-			withdrawnF64, _ := withdrawn.Float64()
-
-			u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
-			err := app.UserService.AccruePoints(context.TODO(), u.ID, current.Add(withdrawn))
-			require.NoError(t, err)
-			err = app.UserService.WithdrawPoints(context.TODO(), u.ID, withdrawn)
-			require.NoError(t, err)
-
-			resp, respBody := testutils.DoTestRequest(
-				t, ts, http.MethodGet, "/api/user/balance", nil,
-				testutils.RequestWithUser(u, app),
-			)
-			defer resp.Body.Close()
-			require.Equal(t, 200, resp.StatusCode)
-			var respJSON showBalanceRespSchema
-			json.Unmarshal([]byte(respBody), &respJSON) // nolint:errcheck
-			assert.Equal(t, currentF64, respJSON.Current)
-			assert.Equal(t, withdrawnF64, respJSON.Withdrawn)
-		})
-	}
-}
-
-func TestHandler_ShowUserBalance_RequiresAuth(t *testing.T) {
-	ts, _, cancel := testutils.PrepareTestServer()
-	defer cancel()
-	resp, _ := testutils.DoTestRequest(t, ts, http.MethodGet, "/api/user/balance", nil)
-	defer resp.Body.Close()
-	assert.Equal(t, 401, resp.StatusCode)
 }

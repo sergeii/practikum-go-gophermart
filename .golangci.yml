@@ -1,12 +1,15 @@
 linters:
   enable-all: true
   disable:
+    - bodyclose
     - gofumpt
     - godot
     - gci
     - funlen
     - golint
+    - interfacer
     - ireturn
+    - maligned
     - scopelint
     - wrapcheck
     - varnamelen

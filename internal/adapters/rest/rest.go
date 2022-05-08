@@ -44,6 +44,8 @@ func registerPrivateRoutes(r *gin.RouterGroup, h *handlers.Handler) {
 	r.POST("/api/user/orders", h.UploadOrder)
 	r.GET("/api/user/orders", h.ListUserOrders)
 	r.GET("/api/user/balance", h.ShowUserBalance)
+	r.POST("/api/user/balance/withdraw", h.RequestWithdrawal)
+	r.GET("/api/user/balance/withdrawals", h.ListUserWithdrawals)
 }
 
 func registerMiddlewares(router *gin.Engine, app *application.App) error { // nolint: unparam

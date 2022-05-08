@@ -32,6 +32,12 @@ func (db *Database) ExecContext(ctx context.Context) pgxtype.Querier {
 }
 
 func (db *Database) WithTransaction(ctx context.Context, txFunc func(ctx context.Context) error) error {
+	// check whether there is already a transaction open
+	if maybeTx := extractTx(ctx); maybeTx != nil {
+		log.Debug().Msg("Transaction is already open")
+		return txFunc(ctx)
+	}
+
 	tx, err := db.conn.Begin(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to begin transaction")
@@ -42,7 +48,9 @@ func (db *Database) WithTransaction(ctx context.Context, txFunc func(ctx context
 			if !errors.Is(errRollback, pgx.ErrTxClosed) {
 				log.Warn().Err(errRollback).Msg("Failed to rollback on defer")
 			}
+			return
 		}
+		log.Info().Msg("Transaction rollback")
 	}()
 
 	// run callback inside the transaction
@@ -54,6 +62,7 @@ func (db *Database) WithTransaction(ctx context.Context, txFunc func(ctx context
 	// if no error, commit
 	if errCommit := tx.Commit(ctx); errCommit != nil {
 		log.Error().Err(errCommit).Msg("Failed to commit transaction")
+		return errCommit
 	}
 	return nil
 }

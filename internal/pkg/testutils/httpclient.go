@@ -1,6 +1,8 @@
 package testutils
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -8,18 +10,34 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/rs/zerolog/log"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 )
 
-type TestRequestOpt func(r *http.Request)
+type TestRequestOpt func(*http.Request, *http.Response)
 
-func RequestWithUser(u models.User, app *application.App) TestRequestOpt {
-	return func(r *http.Request) {
-		Authenticate(r, app, u)
+func WithUser(u models.User, app *application.App) TestRequestOpt {
+	return func(req *http.Request, resp *http.Response) {
+		if req != nil {
+			Authenticate(req, app, u)
+		}
+	}
+}
+
+func MustBindJSON(v interface{}) TestRequestOpt {
+	return func(req *http.Request, resp *http.Response) {
+		if resp != nil {
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				panic(err)
+			}
+			if err := json.Unmarshal(body, v); err != nil {
+				panic(err)
+			}
+		}
 	}
 }
 
@@ -29,10 +47,12 @@ func DoTestRequest(
 	opts ...TestRequestOpt,
 ) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, body) // nolint: noctx
-	require.NoError(t, err)
-
+	if err != nil {
+		panic(err)
+	}
+	// run options that operate upon request
 	for _, opt := range opts {
-		opt(req)
+		opt(req, nil)
 	}
 
 	// disable redirects
@@ -42,10 +62,24 @@ func DoTestRequest(
 		},
 	}
 	resp, err := client.Do(req)
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Warn().Err(err).Msg("Failed to close body for test response")
+		}
+	}()
+
+	// run options that operate upon response
+	for _, opt := range opts {
+		opt(nil, resp)
+	}
 
 	respBody, err := ioutil.ReadAll(resp.Body)
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	return resp, string(respBody)
 }
@@ -67,4 +101,12 @@ func Authenticate(r *http.Request, app *application.App, u models.User) *http.Co
 		r.AddCookie(cookie)
 	}
 	return cookie
+}
+
+func JSONReader(v interface{}) io.Reader {
+	jsonBytes, err := json.Marshal(&v)
+	if err != nil {
+		panic(err)
+	}
+	return bytes.NewReader(jsonBytes)
 }

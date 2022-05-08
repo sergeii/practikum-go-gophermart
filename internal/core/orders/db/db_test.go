@@ -16,7 +16,7 @@ import (
 	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
 )
 
-func TestOrdersRepository_Add_OK(t *testing.T) {
+func TestOrdersDatabase_Add_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -34,7 +34,7 @@ func TestOrdersRepository_Add_OK(t *testing.T) {
 	assert.Equal(t, u.ID, o.User.ID)
 }
 
-func TestOrdersRepository_Add_ErrorOnDuplicate(t *testing.T) {
+func TestOrdersDatabase_Add_ErrorOnDuplicate(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -52,7 +52,7 @@ func TestOrdersRepository_Add_ErrorOnDuplicate(t *testing.T) {
 	assert.Equal(t, 0, o.ID)
 }
 
-func TestOrdersRepository_Add_ErrorOnForeignKeyMissing(t *testing.T) {
+func TestOrdersDatabase_Add_ErrorOnForeignKeyMissing(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -63,7 +63,7 @@ func TestOrdersRepository_Add_ErrorOnForeignKeyMissing(t *testing.T) {
 	assert.Equal(t, 0, o.ID)
 }
 
-func TestOrdersRepository_Add_ErrorOnInvalidStatus(t *testing.T) {
+func TestOrdersDatabase_Add_ErrorOnInvalidStatus(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -80,7 +80,7 @@ func TestOrdersRepository_Add_ErrorOnInvalidStatus(t *testing.T) {
 	assert.Equal(t, 0, o.ID)
 }
 
-func TestRepository_GetListForUser_OK(t *testing.T) {
+func TestOrdersDatabase_GetListForUser_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -109,7 +109,7 @@ func TestRepository_GetListForUser_OK(t *testing.T) {
 	assert.Equal(t, "49927398716", userOrders[2].Number)
 }
 
-func TestRepository_GetListForUser_NoErrorForUnknownUser(t *testing.T) {
+func TestOrdersDatabase_GetListForUser_NoErrorForUnknownUser(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -119,7 +119,7 @@ func TestRepository_GetListForUser_NoErrorForUnknownUser(t *testing.T) {
 	assert.Len(t, userOrders, 0)
 }
 
-func TestRepository_UpdateStatus_OK(t *testing.T) {
+func TestOrdersDatabase_UpdateStatus_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -148,7 +148,7 @@ func TestRepository_UpdateStatus_OK(t *testing.T) {
 	assert.Equal(t, decimal.NewFromInt(0), other2.Accrual)
 }
 
-func TestRepository_UpdateStatus_Errors(t *testing.T) {
+func TestOrdersDatabase_UpdateStatus_Errors(t *testing.T) {
 	tests := []struct {
 		name    string
 		status  models.OrderStatus

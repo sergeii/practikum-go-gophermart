@@ -14,6 +14,7 @@ import (
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/order"
+	"github.com/sergeii/practikum-go-gophermart/pkg/encode"
 )
 
 type UploadOrderResp struct {
@@ -59,7 +60,7 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 	if err != nil {
 		log.Warn().
 			Err(err).Str("path", c.FullPath()).Str("number", orderNumber).
-			Msg("unable to upload new order")
+			Msg("Unable to upload new order")
 		switch {
 		case errors.Is(err, order.ErrOrderUploadedByAnotherUser):
 			c.JSON(http.StatusConflict, gin.H{"error": "order has already been uploaded by another user"})
@@ -104,11 +105,10 @@ func (h *Handler) ListUserOrders(c *gin.Context) {
 	}
 	jsonItems := make([]ListOrderRespItem, 0, len(orders))
 	for _, o := range orders {
-		accrualForDisplay, _ := o.Accrual.Float64()
 		jsonItems = append(jsonItems, ListOrderRespItem{
 			o.Number,
 			o.Status,
-			accrualForDisplay,
+			encode.DecimalToFloat(o.Accrual),
 			o.UploadedAt,
 		})
 	}

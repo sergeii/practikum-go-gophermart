@@ -11,10 +11,10 @@ import (
 	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
+	accrual2 "github.com/sergeii/practikum-go-gophermart/internal/ports/accrual"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue/memory"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/transactor"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/accrual"
 	"github.com/sergeii/practikum-go-gophermart/pkg/timing"
 )
 
@@ -36,7 +36,7 @@ type Service struct {
 	users          users.Repository
 	processing     queue.Repository
 	transactor     transactor.Transactor
-	AccrualService accrual.Service
+	AccrualService accrual2.Service
 }
 
 func WithTransactor(t transactor.Transactor) Option {
@@ -45,7 +45,7 @@ func WithTransactor(t transactor.Transactor) Option {
 	}
 }
 
-func WithAccrualService(as accrual.Service) Option {
+func WithAccrualService(as accrual2.Service) Option {
 	return func(s *Service) {
 		s.AccrualService = as
 	}
@@ -81,13 +81,12 @@ func New(orders orders.Repository, users users.Repository, opts ...Option) Servi
 // the order is not added neither to the queue nor into the repository
 func (s Service) SubmitNewOrder(ctx context.Context, number string, userID int) (models.Order, error) {
 	var order models.Order
-
 	err := s.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		o, err := s.orders.Add(txCtx, models.NewCandidateOrder(number, userID))
 		if err != nil {
 			log.Error().
 				Err(err).Str("order", o.Number).Int("userID", userID).
-				Msg("Failed to add new order to repository")
+				Msg("Failed to add new order")
 			return err
 		}
 		if err = s.processing.Push(txCtx, o.Number); err != nil {
@@ -101,17 +100,20 @@ func (s Service) SubmitNewOrder(ctx context.Context, number string, userID int) 
 	})
 
 	// check whether the order has been uploaded by the same user or not
-	if err != nil && errors.Is(err, orders.ErrOrderAlreadyExists) {
-		dupOrder, getErr := s.orders.GetByNumber(ctx, number)
-		if getErr != nil {
-			return models.Order{}, getErr
+	if err != nil {
+		switch {
+		case errors.Is(err, orders.ErrOrderAlreadyExists):
+			conflict, getErr := s.orders.GetByNumber(ctx, number)
+			if getErr != nil {
+				return models.Order{}, getErr
+			}
+			if conflict.User.ID == userID {
+				return models.Order{}, ErrOrderAlreadyUploaded
+			}
+			return models.Order{}, ErrOrderUploadedByAnotherUser
+		default:
+			return models.Order{}, err
 		}
-		if dupOrder.User.ID == userID {
-			return models.Order{}, ErrOrderAlreadyUploaded
-		}
-		return models.Order{}, ErrOrderUploadedByAnotherUser
-	} else if err != nil {
-		return models.Order{}, err
 	}
 	return order, nil
 }
@@ -203,9 +205,9 @@ func (s *Service) ProcessNextOrder(ctx context.Context) <-chan struct{} {
 }
 
 func (s *Service) handleProcessingError(ctx context.Context, err error, orderNumber string) (<-chan struct{}, error) {
-	var tooManyReqs *accrual.TooManyRequestError
+	var tooManyReqs *accrual2.TooManyRequestError
 	// for some reason, accrual system does not know anything about this order
-	if errors.Is(err, accrual.ErrOrderNotFound) {
+	if errors.Is(err, accrual2.ErrOrderNotFound) {
 		log.Warn().Str("order", orderNumber).Msg("Order could not be found in accrual system")
 		// We mark it invalid and never return to this order again, unless there is a problem saving the status
 		updErr := s.UpdateOrderStatus(ctx, orderNumber, models.OrderStatusInvalid, decimal.NewFromInt(0))
@@ -228,7 +230,7 @@ func (s *Service) handleProcessingError(ctx context.Context, err error, orderNum
 	return nil, err
 }
 
-func (s *Service) handleProcessingResult(ctx context.Context, orderNumber string, os accrual.OrderStatus) error {
+func (s *Service) handleProcessingResult(ctx context.Context, orderNumber string, os accrual2.OrderStatus) error {
 	logOrderStatus := log.Info().Str("order", orderNumber).Str("status", os.Status)
 	switch os.Status {
 	case "INVALID":
@@ -240,7 +242,7 @@ func (s *Service) handleProcessingResult(ctx context.Context, orderNumber string
 	case "PROCESSED":
 		logOrderStatus.Stringer("points", os.Accrual).Msg("Points accrued for order")
 		txErr := s.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
-			if err := s.UpdateOrderStatus(ctx, orderNumber, models.OrderStatusProcessed, os.Accrual); err != nil {
+			if err := s.UpdateOrderStatus(txCtx, orderNumber, models.OrderStatusProcessed, os.Accrual); err != nil {
 				return err
 			}
 			o, err := s.orders.GetByNumber(txCtx, orderNumber)

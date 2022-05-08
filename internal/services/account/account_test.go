@@ -14,7 +14,7 @@ import (
 	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
 )
 
-func TestService_RegisterNewUser_OK(t *testing.T) {
+func TestAccountService_RegisterNewUser_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -35,7 +35,7 @@ func TestService_RegisterNewUser_OK(t *testing.T) {
 	assert.ErrorIs(t, checkWrong, bcrypt.ErrMismatchedHashAndPassword)
 }
 
-func TestService_RegisterNewUser_Errors(t *testing.T) {
+func TestAccountService_RegisterNewUser_Errors(t *testing.T) {
 	tests := []struct {
 		name     string
 		login    string
@@ -95,7 +95,7 @@ func TestService_RegisterNewUser_Errors(t *testing.T) {
 	}
 }
 
-func TestService_Authenticate_OK(t *testing.T) {
+func TestAccountService_Authenticate_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -113,7 +113,7 @@ func TestService_Authenticate_OK(t *testing.T) {
 	assert.Equal(t, u1.ID, u2.ID)
 }
 
-func TestService_Authenticate_Errors(t *testing.T) {
+func TestAccountService_Authenticate_Errors(t *testing.T) {
 	tests := []struct {
 		name     string
 		login    string

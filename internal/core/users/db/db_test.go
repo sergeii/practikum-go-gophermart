@@ -181,7 +181,7 @@ func TestUsersRepository_GetByLogin(t *testing.T) {
 	assert.Equal(t, "", u2.Password)
 }
 
-func TestRepository_AccruePoints_OK(t *testing.T) {
+func TestUsersDatabase_AccruePoints_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -197,7 +197,7 @@ func TestRepository_AccruePoints_OK(t *testing.T) {
 	assert.Equal(t, "20", u.Balance.Current.String())
 }
 
-func TestRepository_AccruePoints_Race(t *testing.T) {
+func TestUsersDatabase_AccruePoints_Race(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -236,7 +236,7 @@ func TestRepository_AccruePoints_Race(t *testing.T) {
 	assert.Equal(t, "128.98", u2.Balance.Current.String())
 }
 
-func TestRepository_WithdrawPoints_OK(t *testing.T) {
+func TestUsersDatabase_WithdrawPoints_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -254,7 +254,25 @@ func TestRepository_WithdrawPoints_OK(t *testing.T) {
 	assert.Equal(t, "0.01", u.Balance.Current.String())
 }
 
-func TestRepository_WithdrawPoints_CannotWithdrawMoreThanHave(t *testing.T) {
+func TestUsersDatabase_WithdrawPoints_CannotWithdrawNegativeSum(t *testing.T) {
+	_, db, cancel := testutils.PrepareTestDatabase()
+	defer cancel()
+
+	repo := udb.New(db)
+	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+
+	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("50"))
+	assert.NoError(t, err)
+	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("10"))
+	assert.NoError(t, err)
+	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("-10"))
+	assert.ErrorIs(t, err, users.ErrUserCantWithdrawNegativeSum)
+
+	u, _ = repo.GetByID(context.TODO(), u.ID)
+	assert.Equal(t, "40", u.Balance.Current.String())
+}
+
+func TestUsersDatabase_WithdrawPoints_CannotWithdrawMoreThanHave(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -268,13 +286,13 @@ func TestRepository_WithdrawPoints_CannotWithdrawMoreThanHave(t *testing.T) {
 	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("9.99"))
 	assert.NoError(t, err)
 	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("0.02"))
-	assert.ErrorIs(t, err, users.ErrUserHasInsufficientPoints)
+	assert.ErrorIs(t, err, users.ErrUserHasInsufficientAccrual)
 
 	u, _ = repo.GetByID(context.TODO(), u.ID)
 	assert.Equal(t, "0.01", u.Balance.Current.String())
 }
 
-func TestRepository_WithdrawPoints_CannotWithdrawMoreThanHave_Race(t *testing.T) {
+func TestUsersDatabase_WithdrawPoints_CannotWithdrawMoreThanHave_Race(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -291,7 +309,7 @@ func TestRepository_WithdrawPoints_CannotWithdrawMoreThanHave_Race(t *testing.T)
 		go func() {
 			err := repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("1.5"))
 			if err != nil {
-				assert.ErrorIs(t, err, users.ErrUserHasInsufficientPoints)
+				assert.ErrorIs(t, err, users.ErrUserHasInsufficientAccrual)
 				atomic.AddInt64(&errCount, 1)
 			}
 			wg.Done()

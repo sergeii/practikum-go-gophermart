@@ -11,7 +11,8 @@ import (
 
 var ErrUserLoginIsOccupied = errors.New("login is occupied by another user")
 var ErrUserNotFoundInRepo = errors.New("user not found")
-var ErrUserHasInsufficientPoints = errors.New("user has no enough points to withdraw")
+var ErrUserHasInsufficientAccrual = errors.New("user has no enough points to withdraw")
+var ErrUserCantWithdrawNegativeSum = errors.New("user must withdraw positive sum only")
 
 type Repository interface {
 	Create(context.Context, models.User) (models.User, error)

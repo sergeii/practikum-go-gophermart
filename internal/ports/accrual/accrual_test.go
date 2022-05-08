@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/accrual"
+	accrual2 "github.com/sergeii/practikum-go-gophermart/internal/ports/accrual"
+	"github.com/sergeii/practikum-go-gophermart/pkg/encode"
 )
 
 func TestService_CheckOrder(t *testing.T) {
@@ -24,7 +24,7 @@ func TestService_CheckOrder(t *testing.T) {
 		{
 			"positive case",
 			200,
-			testutils.MustJSONMarshal(accrual.OrderStatus{
+			encode.MustJSONMarshal(accrual2.OrderStatus{
 				Number: "79927398713", Status: "PROCESSED", Accrual: decimal.RequireFromString("100.5"),
 			}),
 			"PROCESSED",
@@ -33,8 +33,8 @@ func TestService_CheckOrder(t *testing.T) {
 		{
 			"another positive case",
 			200,
-			testutils.MustJSONMarshal(
-				accrual.OrderStatus{Number: "79927398713", Status: "INVALID", Accrual: decimal.Zero},
+			encode.MustJSONMarshal(
+				accrual2.OrderStatus{Number: "79927398713", Status: "INVALID", Accrual: decimal.Zero},
 			),
 			"INVALID",
 			nil,
@@ -44,28 +44,28 @@ func TestService_CheckOrder(t *testing.T) {
 			204,
 			nil,
 			"",
-			accrual.ErrOrderNotFound,
+			accrual2.ErrOrderNotFound,
 		},
 		{
 			"rate limit exceeded without header",
 			429,
 			nil,
 			"",
-			accrual.ErrRespInvalidWaitTime,
+			accrual2.ErrRespInvalidWaitTime,
 		},
 		{
 			"unexpected body",
 			200,
 			nil,
 			"",
-			accrual.ErrRespInvalidData,
+			accrual2.ErrRespInvalidData,
 		},
 		{
 			"unexpected status",
 			500,
 			nil,
 			"",
-			accrual.ErrRespInvalidStatus,
+			accrual2.ErrRespInvalidStatus,
 		},
 	}
 	for _, tt := range tests {
@@ -75,7 +75,7 @@ func TestService_CheckOrder(t *testing.T) {
 				c.String(tt.code, string(tt.body))
 			})
 			ts := httptest.NewServer(r)
-			service, err := accrual.New(ts.URL)
+			service, err := accrual2.New(ts.URL)
 			require.NoError(t, err)
 			os, err := service.CheckOrder("79927398713")
 			if tt.wantErr != nil {
@@ -130,16 +130,16 @@ func TestService_CheckOrder_RetryAfter(t *testing.T) {
 				c.Status(429)
 			})
 			ts := httptest.NewServer(r)
-			service, err := accrual.New(ts.URL)
+			service, err := accrual2.New(ts.URL)
 			require.NoError(t, err)
 			_, err = service.CheckOrder("79927398713")
 			require.Error(t, err)
 			if tt.want {
-				tooManyReqs, ok := err.(*accrual.TooManyRequestError) // nolint: errorlint
+				tooManyReqs, ok := err.(*accrual2.TooManyRequestError) // nolint: errorlint
 				require.True(t, ok)
 				assert.Equal(t, uint(tt.wantRetry), tooManyReqs.RetryAfter)
 			} else {
-				assert.ErrorIs(t, err, accrual.ErrRespInvalidWaitTime)
+				assert.ErrorIs(t, err, accrual2.ErrRespInvalidWaitTime)
 			}
 		})
 	}
@@ -164,12 +164,12 @@ func TestService_New_Validation(t *testing.T) {
 		{
 			"empty address",
 			"",
-			accrual.ErrConfigInvalidAddress,
+			accrual2.ErrConfigInvalidAddress,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := accrual.New(tt.url)
+			_, err := accrual2.New(tt.url)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {

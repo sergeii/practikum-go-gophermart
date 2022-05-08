@@ -22,3 +22,7 @@ func String(length int, alphabet string) string {
 	}
 	return string(b)
 }
+
+func Int(min, max int) int {
+	return mrand.Intn(max-min) + min // nolint: gosec
+}

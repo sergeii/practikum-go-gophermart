@@ -40,7 +40,7 @@ func (r Repository) Create(ctx context.Context, u models.User) (models.User, err
 	if err != nil {
 		return models.User{}, err
 	} else if exists {
-		log.Debug().Str("login", u.Login).Msg("user with same login already exists")
+		log.Debug().Str("login", u.Login).Msg("User with same login already exists")
 		return models.User{}, users.ErrUserLoginIsOccupied
 	}
 
@@ -49,11 +49,11 @@ func (r Repository) Create(ctx context.Context, u models.User) (models.User, err
 		QueryRow(ctx, "INSERT INTO users (login, password) values ($1, $2) RETURNING id", login, u.Password).
 		Scan(&newUserID)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to create new user")
+		log.Error().Err(err).Msg("Failed to create new user")
 		return models.User{}, err
 	}
 
-	log.Debug().Str("login", u.Login).Int("ID", newUserID).Msg("created new user")
+	log.Debug().Str("login", u.Login).Int("ID", newUserID).Msg("Created new user")
 	return models.User{
 		ID:       newUserID,
 		Login:    u.Login,
@@ -76,10 +76,10 @@ func (r Repository) GetByID(ctx context.Context, id int) (models.User, error) {
 		&user.Balance.Current, &user.Balance.Withdrawn,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Debug().Int("ID", id).Msg("user not found")
+			log.Debug().Int("ID", id).Msg("User not found")
 			return models.User{}, users.ErrUserNotFoundInRepo
 		}
-		log.Error().Err(err).Int("ID", id).Msg("failed to query user by ID")
+		log.Error().Err(err).Int("ID", id).Msg("Failed to query user by ID")
 		return models.User{}, err
 	}
 
@@ -117,13 +117,13 @@ func (r Repository) AccruePoints(ctx context.Context, userID int, points decimal
 		var oldCurrent, newCurrent decimal.Decimal
 		tx := r.db.ExecContext(txCtx)
 		if err := tx.QueryRow(
-			ctx, "SELECT 1 FROM users WHERE id = $1 FOR UPDATE", userID,
+			txCtx, "SELECT balance_current FROM users WHERE id = $1 FOR UPDATE", userID,
 		).Scan(&oldCurrent); err != nil {
 			log.Error().Err(err).Int("userID", userID).Msg("Unable to acquire row lock for user")
 			return err
 		}
 		if err := tx.QueryRow(
-			ctx,
+			txCtx,
 			"UPDATE users SET balance_current = balance_current + $1 WHERE id = $2 RETURNING balance_current",
 			points, userID,
 		).Scan(&newCurrent); err != nil {
@@ -147,7 +147,7 @@ func (r Repository) WithdrawPoints(ctx context.Context, userID int, points decim
 		var oldCurrent, newCurrent, oldWithdrawn, newWithdrawn decimal.Decimal
 		tx := r.db.ExecContext(txCtx)
 		if err := tx.QueryRow(
-			ctx,
+			txCtx,
 			"SELECT balance_current, balance_withdrawn FROM users WHERE id = $1 FOR UPDATE",
 			userID,
 		).Scan(&oldCurrent, &oldWithdrawn); err != nil {
@@ -156,10 +156,14 @@ func (r Repository) WithdrawPoints(ctx context.Context, userID int, points decim
 		}
 		// cannot withdraw more points than the user owns
 		if oldCurrent.LessThan(points) {
-			return users.ErrUserHasInsufficientPoints
+			return users.ErrUserHasInsufficientAccrual
+		}
+		// cannot withdraw negative sums
+		if points.LessThanOrEqual(decimal.Zero) {
+			return users.ErrUserCantWithdrawNegativeSum
 		}
 		if err := tx.QueryRow(
-			ctx,
+			txCtx,
 			"UPDATE users SET "+
 				"balance_current = balance_current - $1, balance_withdrawn = balance_withdrawn + $1 "+
 				"WHERE id = $2 RETURNING balance_current, balance_withdrawn",

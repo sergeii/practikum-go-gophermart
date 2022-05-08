@@ -16,12 +16,13 @@ import (
 	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
+	"github.com/sergeii/practikum-go-gophermart/internal/ports/accrual"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/accrual"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/order"
+	"github.com/sergeii/practikum-go-gophermart/pkg/encode"
 )
 
-func TestService_SubmitNewOrder_OK(t *testing.T) {
+func TestOrderService_SubmitNewOrder_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -52,7 +53,7 @@ func TestService_SubmitNewOrder_OK(t *testing.T) {
 	assert.Equal(t, 2, qLen)
 }
 
-func TestService_SubmitNewOrder_Duplicate(t *testing.T) {
+func TestOrderService_SubmitNewOrder_Duplicate(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -78,7 +79,7 @@ func TestService_SubmitNewOrder_Duplicate(t *testing.T) {
 	assert.Equal(t, 1, qLen)
 }
 
-func TestService_UpdateOrderStatus_OK(t *testing.T) {
+func TestOrderService_UpdateOrderStatus_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -108,7 +109,7 @@ func TestService_UpdateOrderStatus_OK(t *testing.T) {
 	assert.Equal(t, "0", u2.Balance.Withdrawn.String())
 }
 
-func TestService_UpdateOrderStatus_NotFound(t *testing.T) {
+func TestOrderService_UpdateOrderStatus_NotFound(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
@@ -122,7 +123,7 @@ func TestService_UpdateOrderStatus_NotFound(t *testing.T) {
 	assert.ErrorIs(t, err, orepo.ErrOrderNotFound)
 }
 
-func TestService_UpdateOrderStatus_ConstraintErrors(t *testing.T) {
+func TestOrderService_UpdateOrderStatus_ConstraintErrors(t *testing.T) {
 	tests := []struct {
 		name    string
 		status  models.OrderStatus
@@ -178,7 +179,7 @@ func TestService_UpdateOrderStatus_ConstraintErrors(t *testing.T) {
 	}
 }
 
-func TestService_ProcessNextOrder_Loop(t *testing.T) {
+func TestOrderService_ProcessNextOrder_Loop(t *testing.T) {
 	type resp struct {
 		code int
 		body []byte
@@ -186,13 +187,13 @@ func TestService_ProcessNextOrder_Loop(t *testing.T) {
 	responses := map[string]resp{
 		"1234567812345670": {
 			code: 200,
-			body: testutils.MustJSONMarshal(accrual.OrderStatus{
+			body: encode.MustJSONMarshal(accrual.OrderStatus{
 				Number: "1234567812345670", Status: "PROCESSED", Accrual: decimal.RequireFromString("100.5"),
 			}),
 		},
 		"4561261212345467": {
 			code: 200,
-			body: testutils.MustJSONMarshal(
+			body: encode.MustJSONMarshal(
 				accrual.OrderStatus{
 					Number: "4561261212345467", Status: "INVALID", Accrual: decimal.NewFromInt(10),
 				},
@@ -200,7 +201,7 @@ func TestService_ProcessNextOrder_Loop(t *testing.T) {
 		},
 		"79927398713": {
 			code: 200,
-			body: testutils.MustJSONMarshal(
+			body: encode.MustJSONMarshal(
 				accrual.OrderStatus{Number: "79927398713", Status: "PROCESSED", Accrual: decimal.NewFromInt(47)},
 			),
 		},
@@ -297,7 +298,7 @@ func TestService_ProcessNextOrder_Loop(t *testing.T) {
 	assert.Equal(t, 0, qLen)
 }
 
-func TestService_ProcessNextOrder_Retry(t *testing.T) {
+func TestOrderService_ProcessNextOrder_Retry(t *testing.T) {
 	done := make(chan struct{})
 	retry := 0
 	r := gin.New()
