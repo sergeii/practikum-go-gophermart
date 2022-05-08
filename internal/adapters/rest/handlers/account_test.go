@@ -1,7 +1,6 @@
 package handlers_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -43,10 +42,12 @@ func TestHandler_RegisterUser_OK(t *testing.T) {
 	ts, app, cancel := testutils.PrepareTestServer()
 	defer cancel()
 
-	reqBody, _ := json.Marshal(&registerUserReqSchema{Login: "happy_shopper", Password: "secret"}) // nolint:errchkjson
-	resp, respBody := testutils.DoTestRequest(t, ts, http.MethodPost, "/api/user/register", bytes.NewReader(reqBody))
 	var respJSON registerUserRespSchema
-	json.Unmarshal([]byte(respBody), &respJSON) // nolint:errcheck
+	resp, _ := testutils.DoTestRequest(
+		t, ts, http.MethodPost, "/api/user/register",
+		testutils.JSONReader(registerUserReqSchema{Login: "happy_shopper", Password: "secret"}),
+		testutils.MustBindJSON(&respJSON),
+	)
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.True(t, respJSON.Result.ID > 0)
 	assert.Equal(t, "happy_shopper", respJSON.Result.Login)
@@ -141,10 +142,11 @@ func TestHandler_RegisterUser_Validation(t *testing.T) {
 			_, err := app.UserService.RegisterNewUser(context.TODO(), "happy_shopper", "super_secret")
 			require.NoError(t, err)
 
-			reqBody, _ := json.Marshal(&registerUserReqSchema{Login: tt.login, Password: tt.password}) // nolint:errchkjson
 			resp, respBody := testutils.DoTestRequest(
-				t, ts, http.MethodPost, "/api/user/register", bytes.NewReader(reqBody),
+				t, ts, http.MethodPost, "/api/user/register",
+				testutils.JSONReader(registerUserReqSchema{Login: tt.login, Password: tt.password}),
 			)
+			resp.Body.Close()
 			if tt.wantSuccess {
 				assert.Equal(t, 200, resp.StatusCode)
 				var respJSON registerUserRespSchema
@@ -177,8 +179,11 @@ func TestHandler_LoginUser_OK(t *testing.T) {
 	u, err := app.UserService.RegisterNewUser(context.TODO(), "happy_shopper", "super_secret")
 	require.NoError(t, err)
 
-	reqBody, _ := json.Marshal(&loginUserReqSchema{Login: "happy_shopper", Password: "super_secret"}) // nolint:errchkjson
-	resp, _ := testutils.DoTestRequest(t, ts, http.MethodPost, "/api/user/login", bytes.NewReader(reqBody))
+	resp, _ := testutils.DoTestRequest(
+		t, ts, http.MethodPost, "/api/user/login", testutils.JSONReader(
+			loginUserReqSchema{Login: "happy_shopper", Password: "super_secret"},
+		),
+	)
 	assert.Equal(t, 200, resp.StatusCode)
 
 	cookie := parseAuthSetCookie(resp)
@@ -273,8 +278,10 @@ func TestHandler_LoginUser_Validation(t *testing.T) {
 			_, err := app.UserService.RegisterNewUser(context.TODO(), "happy_shopper", "super_secret")
 			require.NoError(t, err)
 
-			reqBody, _ := json.Marshal(&loginUserReqSchema{Login: tt.login, Password: tt.password}) // nolint:errchkjson
-			resp, respBody := testutils.DoTestRequest(t, ts, http.MethodPost, "/api/user/login", bytes.NewReader(reqBody))
+			resp, respBody := testutils.DoTestRequest(
+				t, ts, http.MethodPost, "/api/user/login",
+				testutils.JSONReader(loginUserReqSchema{Login: tt.login, Password: tt.password}),
+			)
 			if tt.wantSuccess {
 				assert.Equal(t, 200, resp.StatusCode)
 				cookie := parseAuthSetCookie(resp)

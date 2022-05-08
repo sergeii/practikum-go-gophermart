@@ -2,7 +2,6 @@ package handlers_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -44,14 +43,15 @@ func TestHandler_UploadOrder_OK(t *testing.T) {
 
 	u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
 	before := time.Now()
-	resp, respBody := testutils.DoTestRequest(
+	var respJSON uploadOrderRespSchema
+	resp, _ := testutils.DoTestRequest(
 		t, ts, http.MethodPost,
 		"/api/user/orders", strings.NewReader("1234567812345670"),
 		testutils.WithUser(u, app),
+		testutils.MustBindJSON(&respJSON),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 202, resp.StatusCode)
-	var respJSON uploadOrderRespSchema
-	json.Unmarshal([]byte(respBody), &respJSON) // nolint:errcheck
 	assert.Equal(t, "NEW", respJSON.Result.Status)
 	assert.Equal(t, "1234567812345670", respJSON.Result.Number)
 	assert.True(t, respJSON.Result.UploadedAt.After(before))
@@ -62,11 +62,12 @@ func TestHandler_UploadOrder_OK(t *testing.T) {
 	assert.Equal(t, 1, qLen)
 
 	// duplicate request is handled
-	resp, respBody = testutils.DoTestRequest(
+	resp, respBody := testutils.DoTestRequest(
 		t, ts, http.MethodPost,
 		"/api/user/orders", strings.NewReader("1234567812345670"),
 		testutils.WithUser(u, app),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Equal(t, "", respBody)
 
@@ -123,6 +124,7 @@ func TestHandler_UploadOrder_Validation(t *testing.T) {
 				"/api/user/orders", strings.NewReader(tt.number),
 				testutils.WithUser(u, app),
 			)
+			resp.Body.Close()
 			userOrders, _ := app.OrderService.GetUserOrders(context.TODO(), u.ID)
 			qLen, _ := app.OrderService.ProcessingLength(context.TODO())
 			if tt.want {
@@ -148,16 +150,18 @@ func TestHandler_UploadOrder_ErrorOnDuplicate(t *testing.T) {
 		"/api/user/orders", strings.NewReader("1234567812345670"),
 		testutils.WithUser(u1, app),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 202, resp.StatusCode)
 
-	resp, respBody := testutils.DoTestRequest(
+	var respJSON uploadOrderErrorSchema
+	resp, _ = testutils.DoTestRequest(
 		t, ts, http.MethodPost,
 		"/api/user/orders", strings.NewReader("1234567812345670"),
 		testutils.WithUser(u2, app),
+		testutils.MustBindJSON(&respJSON),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 409, resp.StatusCode)
-	var respJSON uploadOrderErrorSchema
-	json.Unmarshal([]byte(respBody), &respJSON) // nolint:errcheck
 	assert.Equal(t, "order has already been uploaded by another user", respJSON.Error)
 }
 
@@ -209,6 +213,7 @@ func TestHandler_UploadOrder_LuhnValidation(t *testing.T) {
 				"/api/user/orders", strings.NewReader(tt.number),
 				testutils.WithUser(u, app),
 			)
+			resp.Body.Close()
 			userOrders, _ := app.OrderService.GetUserOrders(context.TODO(), u.ID)
 			if tt.want {
 				assert.Equal(t, 202, resp.StatusCode)
@@ -251,6 +256,7 @@ func TestHandler_UploadOrder_ErrorWhenQueueIsFull(t *testing.T) {
 				"/api/user/orders", strings.NewReader("1234567812345670"),
 				testutils.WithUser(u, app),
 			)
+			resp.Body.Close()
 			assert.Equal(t, 202, resp.StatusCode)
 
 			resp, _ = testutils.DoTestRequest(
@@ -258,6 +264,7 @@ func TestHandler_UploadOrder_ErrorWhenQueueIsFull(t *testing.T) {
 				"/api/user/orders", strings.NewReader("79927398713"),
 				testutils.WithUser(u, app),
 			)
+			resp.Body.Close()
 
 			if tt.wantErr {
 				assert.Equal(t, 503, resp.StatusCode)
@@ -275,6 +282,7 @@ func TestHandler_UploadOrder_RequiresAuth(t *testing.T) {
 		t, ts, http.MethodPost,
 		"/api/user/orders", strings.NewReader("100500"),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }
 
@@ -294,14 +302,14 @@ func TestHandler_ListUserOrders_OK(t *testing.T) {
 		models.OrderStatusProcessed, decimal.RequireFromString("10.1"),
 	)
 
-	resp, body := testutils.DoTestRequest(
+	jsonItems := make([]listOrderItemSchema, 0)
+	resp, _ := testutils.DoTestRequest(
 		t, ts, http.MethodGet, "/api/user/orders", nil,
 		testutils.WithUser(u, app),
+		testutils.MustBindJSON(&jsonItems),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-
-	jsonItems := make([]listOrderItemSchema, 0)
-	json.Unmarshal([]byte(body), &jsonItems) // nolint:errcheck
 	assert.Len(t, jsonItems, 2)
 	assert.Equal(t, "NEW", jsonItems[0].Status)
 	assert.Equal(t, "4561261212345467", jsonItems[0].Number)
@@ -324,6 +332,7 @@ func TestHandler_ListUserOrders_NoOrdersForUser(t *testing.T) {
 		t, ts, http.MethodGet, "/api/user/orders", nil,
 		testutils.WithUser(u, app),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 204, resp.StatusCode)
 }
 
@@ -331,5 +340,6 @@ func TestHandler_ListUserOrders_RequiresAuth(t *testing.T) {
 	ts, _, cancel := testutils.PrepareTestServer()
 	defer cancel()
 	resp, _ := testutils.DoTestRequest(t, ts, http.MethodGet, "/api/user/orders", nil)
+	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }

@@ -65,6 +65,7 @@ func TestHandler_ShowUserBalance_OK(t *testing.T) {
 				testutils.WithUser(u, app),
 				testutils.MustBindJSON(&respJSON),
 			)
+			resp.Body.Close()
 			require.Equal(t, 200, resp.StatusCode)
 			assert.Equal(t, encode.DecimalToFloat(current), respJSON.Current)
 			assert.Equal(t, encode.DecimalToFloat(withdrawn), respJSON.Withdrawn)

@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
@@ -65,11 +63,7 @@ func DoTestRequest(
 	if err != nil {
 		panic(err)
 	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Warn().Err(err).Msg("Failed to close body for test response")
-		}
-	}()
+	defer resp.Body.Close()
 
 	// run options that operate upon response
 	for _, opt := range opts {

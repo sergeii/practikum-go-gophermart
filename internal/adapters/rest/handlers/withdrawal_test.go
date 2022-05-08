@@ -60,6 +60,7 @@ func TestHandler_RequestWithdrawal_OK(t *testing.T) {
 			testutils.WithUser(u, app),
 			testutils.MustBindJSON(&respJSON),
 		)
+		resp.Body.Close()
 		assert.Equal(t, 200, resp.StatusCode)
 		assert.True(t, respJSON.Result.ID > 0)
 		assert.Equal(t, item.order, respJSON.Result.Order)
@@ -162,6 +163,7 @@ func TestHandler_RequestWithdrawal_Validation(t *testing.T) {
 				testutils.WithUser(u, app),
 				testutils.MustBindJSON(&respJSON),
 			)
+			resp.Body.Close()
 			balance, _ := app.UserService.GetBalance(ctx, u.ID)
 			userWithdrawals, _ := app.WithdrawalService.GetUserWithdrawals(ctx, u.ID)
 
@@ -203,6 +205,7 @@ func TestHandler_RequestWithdrawal_NotEnoughPointsRace(t *testing.T) {
 				testutils.WithUser(u, app),
 				testutils.MustBindJSON(&respJSON),
 			)
+			resp.Body.Close()
 			if resp.StatusCode != 200 {
 				assert.Equal(t, 402, resp.StatusCode)
 				atomic.AddInt64(&errCount, 1)
@@ -274,6 +277,7 @@ func TestHandler_RequestWithdrawal_LuhnValidation(t *testing.T) {
 				testutils.WithUser(u, app),
 				testutils.MustBindJSON(&respJSON),
 			)
+			resp.Body.Close()
 			balance, _ := app.UserService.GetBalance(ctx, u.ID)
 			if tt.want {
 				assert.Equal(t, 200, resp.StatusCode)
@@ -293,6 +297,7 @@ func TestHandler_RequestWithdrawal_RequiresAuth(t *testing.T) {
 	defer cancel()
 
 	resp, _ := testutils.DoTestRequest(t, ts, http.MethodPost, "/api/user/balance/withdraw", nil)
+	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }
 
@@ -316,6 +321,7 @@ func TestHandler_ListUserWithdrawals_OK(t *testing.T) {
 		testutils.WithUser(u, app),
 		testutils.MustBindJSON(&uItems),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Len(t, uItems, 2)
 	assert.Equal(t, "1234567812345670", uItems[0].Order)
@@ -329,6 +335,7 @@ func TestHandler_ListUserWithdrawals_OK(t *testing.T) {
 		testutils.WithUser(other, app),
 		testutils.MustBindJSON(&oItems),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Len(t, oItems, 1)
 	assert.Equal(t, "4561261212345467", oItems[0].Order)
@@ -345,6 +352,7 @@ func TestHandler_ListUserWithdrawals_NoWithdrawalsForUser(t *testing.T) {
 		t, ts, http.MethodGet, "/api/user/balance/withdrawals", nil,
 		testutils.WithUser(u, app),
 	)
+	resp.Body.Close()
 	assert.Equal(t, 204, resp.StatusCode)
 }
 
@@ -352,5 +360,6 @@ func TestHandler_ListUserWithdrawals_RequiresAuth(t *testing.T) {
 	ts, _, cancel := testutils.PrepareTestServer()
 	defer cancel()
 	resp, _ := testutils.DoTestRequest(t, ts, http.MethodGet, "/api/user/balance/withdrawals", nil)
+	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }
