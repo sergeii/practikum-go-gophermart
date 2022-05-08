@@ -25,7 +25,7 @@ var ErrOrderProcessingErrorIsHandled = errors.New("failed order is handled succe
 const (
 	PostProcessWaitOnFinishedRun = time.Millisecond * 50
 	PostProcessWaitOnError       = time.Millisecond * 100
-	PostProcessWaitOnEmptyQueue  = time.Second * 30
+	PostProcessWaitOnEmptyQueue  = time.Second
 )
 
 type Option func(s *Service)
