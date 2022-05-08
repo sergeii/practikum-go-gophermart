@@ -11,11 +11,10 @@ import (
 	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
-	accrual2 "github.com/sergeii/practikum-go-gophermart/internal/ports/accrual"
+	"github.com/sergeii/practikum-go-gophermart/internal/ports/accrual"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue/memory"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/transactor"
-	"github.com/sergeii/practikum-go-gophermart/pkg/timing"
 )
 
 var ErrOrderAlreadyUploaded = errors.New("order has already been uploaded by the same user")
@@ -26,7 +25,7 @@ var ErrOrderProcessingErrorIsHandled = errors.New("failed order is handled succe
 const (
 	PostProcessWaitOnFinishedRun = time.Millisecond * 50
 	PostProcessWaitOnError       = time.Millisecond * 100
-	PostProcessWaitOnEmptyQueue  = time.Second
+	PostProcessWaitOnEmptyQueue  = time.Second * 30
 )
 
 type Option func(s *Service)
@@ -36,7 +35,7 @@ type Service struct {
 	users          users.Repository
 	processing     queue.Repository
 	transactor     transactor.Transactor
-	AccrualService accrual2.Service
+	AccrualService accrual.Service
 }
 
 func WithTransactor(t transactor.Transactor) Option {
@@ -45,7 +44,7 @@ func WithTransactor(t transactor.Transactor) Option {
 	}
 }
 
-func WithAccrualService(as accrual2.Service) Option {
+func WithAccrualService(as accrual.Service) Option {
 	return func(s *Service) {
 		s.AccrualService = as
 	}
@@ -163,16 +162,16 @@ func (s *Service) ProcessingLength(ctx context.Context) (int, error) {
 // before starting to process the next order.
 // The returned channel contains a timer with varying duration.
 // In its turn, the varying duration depends on the busyness of the accrual system
-func (s *Service) ProcessNextOrder(ctx context.Context) <-chan struct{} {
+func (s *Service) ProcessNextOrder(ctx context.Context) <-chan time.Time {
 	orderNumber, err := s.processing.Pop(ctx)
 	if err != nil {
 		// queue is currently empty, wait a bit
 		if errors.Is(err, queue.ErrQueueIsEmpty) {
 			log.Debug().Msg("Accrual order queue is empty")
-			return timing.Wait(ctx, PostProcessWaitOnEmptyQueue)
+			return time.After(PostProcessWaitOnEmptyQueue)
 		}
 		log.Error().Err(err).Str("order", orderNumber).Msg("Unable to retrieve order from queue")
-		return timing.Wait(ctx, PostProcessWaitOnError)
+		return time.After(PostProcessWaitOnError)
 	}
 
 	log.Info().Str("order", orderNumber).Msg("Checking order in accrual system")
@@ -189,7 +188,7 @@ func (s *Service) ProcessNextOrder(ctx context.Context) <-chan struct{} {
 		if customWait != nil {
 			return customWait
 		}
-		return timing.Wait(ctx, PostProcessWaitOnError)
+		return time.After(PostProcessWaitOnError)
 	}
 
 	if handleErr := s.handleProcessingResult(ctx, orderNumber, orderStatus); handleErr != nil {
@@ -201,13 +200,13 @@ func (s *Service) ProcessNextOrder(ctx context.Context) <-chan struct{} {
 		s.maybeResubmitOrder(ctx, orderNumber)
 	}
 
-	return timing.Wait(ctx, PostProcessWaitOnFinishedRun)
+	return time.After(PostProcessWaitOnFinishedRun)
 }
 
-func (s *Service) handleProcessingError(ctx context.Context, err error, orderNumber string) (<-chan struct{}, error) {
-	var tooManyReqs *accrual2.TooManyRequestError
+func (s *Service) handleProcessingError(ctx context.Context, err error, orderNumber string) (<-chan time.Time, error) {
+	var tooManyReqs *accrual.TooManyRequestError
 	// for some reason, accrual system does not know anything about this order
-	if errors.Is(err, accrual2.ErrOrderNotFound) {
+	if errors.Is(err, accrual.ErrOrderNotFound) {
 		log.Warn().Str("order", orderNumber).Msg("Order could not be found in accrual system")
 		// We mark it invalid and never return to this order again, unless there is a problem saving the status
 		updErr := s.UpdateOrderStatus(ctx, orderNumber, models.OrderStatusInvalid, decimal.NewFromInt(0))
@@ -224,13 +223,13 @@ func (s *Service) handleProcessingError(ctx context.Context, err error, orderNum
 		log.Info().
 			Err(err).Str("order", orderNumber).Uint("wait", tooManyReqs.RetryAfter).
 			Msg("accrual system is busy")
-		return timing.Wait(ctx, time.Second*time.Duration(tooManyReqs.RetryAfter)), tooManyReqs
+		return time.After(time.Second * time.Duration(tooManyReqs.RetryAfter)), tooManyReqs
 	}
 	log.Error().Err(err).Str("order", orderNumber).Msg("Failed to check order status at accrual system")
 	return nil, err
 }
 
-func (s *Service) handleProcessingResult(ctx context.Context, orderNumber string, os accrual2.OrderStatus) error {
+func (s *Service) handleProcessingResult(ctx context.Context, orderNumber string, os accrual.OrderStatus) error {
 	logOrderStatus := log.Info().Str("order", orderNumber).Str("status", os.Status)
 	switch os.Status {
 	case "INVALID":

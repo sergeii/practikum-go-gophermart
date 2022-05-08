@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -14,6 +15,7 @@ var ErrProcessingInterrupted = errors.New("processing is interrupted")
 
 func Run(ctx context.Context, app *application.App, wg *sync.WaitGroup, failure chan error) {
 	defer wg.Done()
+	wait := time.After(time.Millisecond)
 	for {
 		select {
 		case <-ctx.Done():
@@ -21,9 +23,8 @@ func Run(ctx context.Context, app *application.App, wg *sync.WaitGroup, failure 
 			log.Info().Msg("Stopping processing of accrual queue")
 			failure <- ErrProcessingInterrupted
 			return
-		default:
-			wait := app.OrderService.ProcessNextOrder(ctx)
-			<-wait
+		case <-wait:
+			wait = app.OrderService.ProcessNextOrder(ctx)
 		}
 	}
 }
