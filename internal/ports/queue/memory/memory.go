@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/sergeii/practikum-go-gophermart/internal/core/queue"
+	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue"
 )
 
 type Queue struct {

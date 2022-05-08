@@ -7,10 +7,10 @@ import (
 	"github.com/go-playground/validator/v10/non-standard/validators"
 	"github.com/rs/zerolog/log"
 
+	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/handlers"
+	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
+	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/validate"
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/handlers"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/middleware/auth"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/validate"
 )
 
 func New(app *application.App) (*gin.Engine, error) {
@@ -27,7 +27,7 @@ func New(app *application.App) (*gin.Engine, error) {
 	return router, nil
 }
 
-func registerRoutes(r *gin.Engine, app *application.App) error {
+func registerRoutes(r *gin.Engine, app *application.App) error { // nolint: unparam
 	handler := handlers.New(app)
 	privateRoutes := r.Group("/", auth.RequireAuthentication)
 	registerPublicRoutes(r, handler)
@@ -43,9 +43,10 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.Handler) {
 func registerPrivateRoutes(r *gin.RouterGroup, h *handlers.Handler) {
 	r.POST("/api/user/orders", h.UploadOrder)
 	r.GET("/api/user/orders", h.ListUserOrders)
+	r.GET("/api/user/balance", h.ShowUserBalance)
 }
 
-func registerMiddlewares(router *gin.Engine, app *application.App) error {
+func registerMiddlewares(router *gin.Engine, app *application.App) error { // nolint: unparam
 	router.Use(gin.LoggerWithWriter(log.Logger))
 	router.Use(gin.Recovery())
 	router.Use(auth.Authentication(app.Cfg))

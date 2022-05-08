@@ -6,6 +6,7 @@ linters:
     - gci
     - funlen
     - golint
+    - ireturn
     - scopelint
     - wrapcheck
     - varnamelen

@@ -9,10 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
+	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/middleware/auth"
 )
 
 type RegisterUserReq struct {
@@ -67,6 +67,23 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"result": RegisterUserResp{ID: u.ID, Login: u.Login}})
 }
 
+func (h *Handler) setAuthCookie(c *gin.Context, u models.User) error {
+	token, err := auth.GenerateAuthTokenCookie(u, h.app.Cfg.SecretKey)
+	if err != nil {
+		return err
+	}
+	cookie := http.Cookie{
+		Name:     auth.CookieName,
+		Value:    token,
+		Path:     "/",
+		Expires:  time.Now().Add(auth.CookieAge),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	}
+	http.SetCookie(c.Writer, &cookie)
+	return nil
+}
+
 type LoginUserReq struct {
 	Login    string `json:"login" binding:"required,notblank"`
 	Password string `json:"password" binding:"required,notblank"`
@@ -115,19 +132,24 @@ func (h *Handler) LoginUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"result": RegisterUserResp{ID: u.ID, Login: u.Login}})
 }
 
-func (h *Handler) setAuthCookie(c *gin.Context, u models.User) error {
-	token, err := auth.GenerateAuthTokenCookie(u, h.app.Cfg.SecretKey)
+type UserBalanceResp struct {
+	Current   float64 `json:"current"`
+	Withdrawn float64 `json:"withdrawn"`
+}
+
+func (h *Handler) ShowUserBalance(c *gin.Context) {
+	u := c.MustGet(auth.ContextKey).(models.User) // nolint: forcetypeassert
+	balance, err := h.app.UserService.GetBalance(c.Request.Context(), u.ID)
 	if err != nil {
-		return err
+		log.Error().
+			Err(err).Str("path", c.FullPath()).Int("userID", u.ID).
+			Msg("unable to show user balance due to error")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}
-	cookie := http.Cookie{
-		Name:     auth.CookieName,
-		Value:    token,
-		Path:     "/",
-		Expires:  time.Now().Add(auth.CookieAge),
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	}
-	http.SetCookie(c.Writer, &cookie)
-	return nil
+	currentForDisplay, _ := balance.Current.Float64()
+	withdrawnForDisplay, _ := balance.Withdrawn.Float64()
+	c.JSON(
+		http.StatusOK,
+		UserBalanceResp{currentForDisplay, withdrawnForDisplay},
+	)
 }

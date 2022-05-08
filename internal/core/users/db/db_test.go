@@ -2,22 +2,25 @@ package db_test
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
-	"github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
+	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
 )
 
 func TestUsersRepository_Create_OK(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	repo := db.New(pgpool)
+	repo := udb.New(db)
 	u, err := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 	require.NoError(t, err)
 	assert.True(t, u.ID > 0)
@@ -60,10 +63,10 @@ func TestUsersRepository_Create_ErrorOnDuplicate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pgpool, cancel := testutils.PrepareTestDatabase()
+			_, db, cancel := testutils.PrepareTestDatabase()
 			defer cancel()
 
-			repo := db.New(pgpool)
+			repo := udb.New(db)
 			u1, err := repo.Create(context.TODO(), models.User{Login: "foobar", Password: "str0ng"})
 			require.NoError(t, err)
 			assert.True(t, u1.ID > 0)
@@ -115,10 +118,10 @@ func TestUsersRepository_Create_FieldsMustNotBeEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pgpool, cancel := testutils.PrepareTestDatabase()
+			_, db, cancel := testutils.PrepareTestDatabase()
 			defer cancel()
 
-			repo := db.New(pgpool)
+			repo := udb.New(db)
 
 			u, err := repo.Create(context.TODO(), models.User{Login: tt.login, Password: tt.password})
 			if tt.wantErr {
@@ -133,10 +136,10 @@ func TestUsersRepository_Create_FieldsMustNotBeEmpty(t *testing.T) {
 }
 
 func TestUsersRepository_GetByID(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	repo := db.New(pgpool)
+	repo := udb.New(db)
 	u, err := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 	require.NoError(t, err)
 	assert.True(t, u.ID > 0)
@@ -156,10 +159,10 @@ func TestUsersRepository_GetByID(t *testing.T) {
 }
 
 func TestUsersRepository_GetByLogin(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	repo := db.New(pgpool)
+	repo := udb.New(db)
 	u, err := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 	require.NoError(t, err)
 	assert.True(t, u.ID > 0)
@@ -176,4 +179,127 @@ func TestUsersRepository_GetByLogin(t *testing.T) {
 	assert.Equal(t, 0, u2.ID)
 	assert.Equal(t, "", u2.Login)
 	assert.Equal(t, "", u2.Password)
+}
+
+func TestRepository_AccruePoints_OK(t *testing.T) {
+	_, db, cancel := testutils.PrepareTestDatabase()
+	defer cancel()
+
+	repo := udb.New(db)
+	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+
+	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("10.01"))
+	assert.NoError(t, err)
+	err = repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("9.99"))
+	assert.NoError(t, err)
+
+	u, _ = repo.GetByID(context.TODO(), u.ID)
+	assert.Equal(t, "20", u.Balance.Current.String())
+}
+
+func TestRepository_AccruePoints_Race(t *testing.T) {
+	_, db, cancel := testutils.PrepareTestDatabase()
+	defer cancel()
+
+	repo := udb.New(db)
+	u1, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u2, _ := repo.Create(context.TODO(), models.User{Login: "othercustomer", Password: "secr3t"})
+
+	queue := []struct {
+		userID int
+		points string
+	}{
+		{u1.ID, "19.5"},
+		{u1.ID, "0.1"},
+		{u2.ID, "0"},
+		{u1.ID, "104.99"},
+		{u2.ID, "18"},
+		{u1.ID, "5.9"},
+		{u2.ID, "9.99"},
+		{u2.ID, "100.99"},
+	}
+	wg := &sync.WaitGroup{}
+	for _, item := range queue {
+		wg.Add(1)
+		go func(u int, p string) {
+			err := repo.AccruePoints(context.TODO(), u, decimal.RequireFromString(p))
+			assert.NoError(t, err)
+			wg.Done()
+		}(item.userID, item.points)
+	}
+	wg.Wait()
+
+	u1, _ = repo.GetByID(context.TODO(), u1.ID)
+	assert.Equal(t, "130.49", u1.Balance.Current.String())
+
+	u2, _ = repo.GetByID(context.TODO(), u2.ID)
+	assert.Equal(t, "128.98", u2.Balance.Current.String())
+}
+
+func TestRepository_WithdrawPoints_OK(t *testing.T) {
+	_, db, cancel := testutils.PrepareTestDatabase()
+	defer cancel()
+
+	repo := udb.New(db)
+	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+
+	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("20.01"))
+	assert.NoError(t, err)
+	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("10.01"))
+	assert.NoError(t, err)
+	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("9.99"))
+	assert.NoError(t, err)
+
+	u, _ = repo.GetByID(context.TODO(), u.ID)
+	assert.Equal(t, "0.01", u.Balance.Current.String())
+}
+
+func TestRepository_WithdrawPoints_CannotWithdrawMoreThanHave(t *testing.T) {
+	_, db, cancel := testutils.PrepareTestDatabase()
+	defer cancel()
+
+	repo := udb.New(db)
+	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+
+	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("20.01"))
+	assert.NoError(t, err)
+	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("10.01"))
+	assert.NoError(t, err)
+	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("9.99"))
+	assert.NoError(t, err)
+	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("0.02"))
+	assert.ErrorIs(t, err, users.ErrUserHasInsufficientPoints)
+
+	u, _ = repo.GetByID(context.TODO(), u.ID)
+	assert.Equal(t, "0.01", u.Balance.Current.String())
+}
+
+func TestRepository_WithdrawPoints_CannotWithdrawMoreThanHave_Race(t *testing.T) {
+	_, db, cancel := testutils.PrepareTestDatabase()
+	defer cancel()
+
+	repo := udb.New(db)
+	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+
+	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("5.0"))
+	assert.NoError(t, err)
+
+	wg := &sync.WaitGroup{}
+	var errCount int64
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			err := repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("1.5"))
+			if err != nil {
+				assert.ErrorIs(t, err, users.ErrUserHasInsufficientPoints)
+				atomic.AddInt64(&errCount, 1)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	u, _ = repo.GetByID(context.TODO(), u.ID)
+	assert.Equal(t, "0.5", u.Balance.Current.String())
+	assert.Equal(t, 7, int(errCount))
 }

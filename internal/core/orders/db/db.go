@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/rs/zerolog/log"
 	"github.com/shopspring/decimal"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
+	"github.com/sergeii/practikum-go-gophermart/internal/persistence/db"
 )
 
 type orderRow struct {
@@ -24,22 +24,22 @@ type orderRow struct {
 }
 
 type Repository struct {
-	db *pgxpool.Pool
+	db *db.Database
 }
 
-func New(pgpool *pgxpool.Pool) Repository {
-	return Repository{db: pgpool}
+func New(db *db.Database) Repository {
+	return Repository{db}
 }
 
 // Add attempts to insert a new order.
 // A new order cannot be added in case of another order having the same number.
 // In that case an error is returned
-func (r Repository) Add(
-	ctx context.Context, co models.Order, next func(models.Order, pgx.Tx) error,
-) (models.Order, error) {
-	var exists bool
+func (r Repository) Add(ctx context.Context, co models.Order) (models.Order, error) {
+	conn := r.db.ExecContext(ctx)
+
 	// check whether an order with the same number has already been uploaded
-	err := r.db.
+	var exists bool
+	err := conn.
 		QueryRow(ctx, "SELECT EXISTS(SELECT id FROM orders WHERE number=$1)", co.Number).
 		Scan(&exists)
 	if err != nil {
@@ -51,15 +51,9 @@ func (r Repository) Add(
 		return models.Order{}, orders.ErrOrderAlreadyExists
 	}
 
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return models.Order{}, err
-	}
-	defer tx.Rollback(ctx) // nolint: errcheck
-
 	var newOrderID int
 	var actualUploadedAt time.Time
-	err = tx.
+	err = conn.
 		QueryRow(
 			ctx,
 			"INSERT INTO orders (uploaded_at, user_id, number, status, accrual) "+
@@ -67,27 +61,16 @@ func (r Repository) Add(
 			co.UploadedAt, co.User.ID, co.Number, co.Status, co.Accrual,
 		).
 		Scan(&newOrderID, &actualUploadedAt)
+
 	if err != nil {
 		log.Error().Err(err).Msg("failed to add order")
 		return models.Order{}, err
 	}
+
 	order := models.NewAcceptedOrder(newOrderID, co.Number, co.User.ID, co.Status, co.Accrual, actualUploadedAt)
 	log.Debug().
 		Str("number", order.Number).Int("ID", newOrderID).
 		Msg("added new order")
-
-	// perform an extra action. If that fails, rollback the transaction
-	if err = next(order, tx); err != nil {
-		if errRollback := tx.Rollback(ctx); errRollback != nil {
-			return models.Order{}, errRollback
-		}
-		return models.Order{}, err
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return models.Order{}, err
-	}
 
 	return order, nil
 }
@@ -95,7 +78,7 @@ func (r Repository) Add(
 // GetByNumber attempts to find and return an order by its external number
 func (r Repository) GetByNumber(ctx context.Context, number string) (models.Order, error) {
 	var row orderRow
-	result := r.db.QueryRow(
+	result := r.db.ExecContext(ctx).QueryRow(
 		ctx,
 		"SELECT id, user_id, uploaded_at, status, accrual FROM orders WHERE number = $1",
 		number,
@@ -116,7 +99,7 @@ func (r Repository) GetByNumber(ctx context.Context, number string) (models.Orde
 // The orders are sorted from the oldest to the newest
 func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Order, error) {
 	var row orderRow
-	rows, err := r.db.Query(
+	rows, err := r.db.ExecContext(ctx).Query(
 		ctx,
 		"SELECT id, uploaded_at, status, accrual, number, user_id FROM orders "+
 			"WHERE user_id = $1 ORDER BY uploaded_at ASC",
@@ -152,27 +135,22 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Or
 func (r Repository) UpdateStatus(
 	ctx context.Context, orderID int, status models.OrderStatus, accrual decimal.Decimal,
 ) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx) // nolint: errcheck
+	return r.db.WithTransaction(ctx, func(txCtx context.Context) error {
+		tx := r.db.ExecContext(txCtx)
+		// ensure that we update the order exclusively
+		if _, err := tx.Exec(ctx, "SELECT 1 FROM orders WHERE id = $1 FOR UPDATE NOWAIT", orderID); err != nil {
+			log.Error().Err(err).Int("orderID", orderID).Msg("Unable to acquire row lock for order")
+			return err
+		}
+		_, err := tx.Exec(
+			ctx,
+			"UPDATE orders SET status = $1, accrual = $2 WHERE id = $3",
+			status, accrual, orderID,
+		)
+		if err != nil {
+			return err
+		}
 
-	// ensure that we update the order exclusively
-	if _, err = tx.Exec(ctx, "SELECT 1 FROM orders WHERE id = $1 FOR UPDATE", orderID); err != nil {
-		log.Error().Err(err).Int("orderID", orderID).Msg("Unable to acquire row lock for order")
-		return err
-	}
-
-	_, err = tx.Exec(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE id = $3", status, accrual, orderID)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
+		return nil
+	})
 }

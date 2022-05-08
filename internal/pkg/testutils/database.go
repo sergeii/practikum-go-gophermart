@@ -13,10 +13,11 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/sergeii/practikum-go-gophermart/db/migrations"
+	"github.com/sergeii/practikum-go-gophermart/internal/persistence/db"
 	"github.com/sergeii/practikum-go-gophermart/pkg/random"
 )
 
-func PrepareTestDatabase() (*pgxpool.Pool, func()) {
+func PrepareTestDatabase() (*pgxpool.Pool, *db.Database, func()) {
 	type config struct {
 		DatabaseDSN string `env:"DATABASE_URI" envDefault:"postgresql://gophermart@localhost:5432/gophermart"`
 	}
@@ -30,11 +31,11 @@ func PrepareTestDatabase() (*pgxpool.Pool, func()) {
 	}
 	// create a separate schema with random name, so concurrent tests' databases dont clash with each other
 	schema := random.String(5, "abcdefghijklmnopqrstuvwxyz")
-	db, err := pgx.Connect(context.TODO(), cfg.DatabaseDSN)
+	pg, err := pgx.Connect(context.TODO(), cfg.DatabaseDSN)
 	if err != nil {
 		panic(err)
 	}
-	if _, err := db.Exec(context.TODO(), fmt.Sprintf("CREATE SCHEMA %s", schema)); err != nil {
+	if _, err := pg.Exec(context.TODO(), fmt.Sprintf("CREATE SCHEMA %s", schema)); err != nil {
 		panic(err)
 	}
 	// use the prepared schema
@@ -57,10 +58,10 @@ func PrepareTestDatabase() (*pgxpool.Pool, func()) {
 		panic(err)
 	}
 
-	return pool, func() {
+	return pool, db.New(pool), func() {
 		defer pool.Close()
-		defer db.Close(context.TODO())
-		if _, err := db.Exec(context.TODO(), fmt.Sprintf("DROP SCHEMA %s CASCADE", schema)); err != nil {
+		defer pg.Close(context.TODO())
+		if _, err := pg.Exec(context.TODO(), fmt.Sprintf("DROP SCHEMA %s CASCADE", schema)); err != nil {
 			panic(err)
 		}
 	}

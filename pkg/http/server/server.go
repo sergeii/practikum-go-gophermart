@@ -133,7 +133,7 @@ func (s *HTTPServer) ListenAndServe(ctx context.Context) error {
 		}
 	case <-ctx.Done():
 	}
-	return s.Stop()
+	return s.Stop() // nolint: contextcheck
 }
 
 func (s *HTTPServer) ListenAddr() net.Addr {

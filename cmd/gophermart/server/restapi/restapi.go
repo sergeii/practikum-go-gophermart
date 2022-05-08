@@ -4,15 +4,18 @@ import (
 	"context"
 	"sync"
 
+	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
+	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest"
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/rest"
 	httpserver "github.com/sergeii/practikum-go-gophermart/pkg/http/server"
 )
 
 func Run(ctx context.Context, app *application.App, wg *sync.WaitGroup, failure chan error) {
 	defer wg.Done()
+
+	gin.SetMode(gin.ReleaseMode)
 
 	router, err := rest.New(app)
 	if err != nil {

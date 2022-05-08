@@ -22,7 +22,7 @@ func Run(ctx context.Context, app *application.App, wg *sync.WaitGroup, failure 
 			failure <- ErrProcessingInterrupted
 			return
 		default:
-			wait := app.ProcessingService.ProcessNextOrder(ctx)
+			wait := app.OrderService.ProcessNextOrder(ctx)
 			<-wait
 		}
 	}

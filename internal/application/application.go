@@ -4,14 +4,12 @@ import (
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/order"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/processing"
 )
 
 type App struct {
-	UserService       account.Service
-	OrderService      order.Service
-	ProcessingService processing.Service
-	Cfg               config.Config
+	UserService  account.Service
+	OrderService order.Service
+	Cfg          config.Config
 }
 
 type Option func(a *App)
@@ -35,11 +33,5 @@ func WithUserService(s account.Service) Option {
 func WithOrderService(s order.Service) Option {
 	return func(a *App) {
 		a.OrderService = s
-	}
-}
-
-func WithProcessingService(s processing.Service) Option {
-	return func(a *App) {
-		a.ProcessingService = s
 	}
 }

@@ -16,7 +16,7 @@ type Config struct {
 	ServerShutdownTimeout  time.Duration
 	ServerReadTimeout      time.Duration
 	ServerWriteTimeout     time.Duration
-	DatabaseDSN            string `env:"DATABASE_URI"`
+	DatabaseDSN            string `env:"DATABASE_URI" envDefault:"postgres://gophermart@localhost:5432/gophermart?sslmode=disable"` // nolint: lll
 	DatabaseConnectTimeout time.Duration
 	AccrualSystemURL       string `env:"ACCRUAL_SYSTEM_ADDRESS" envDefault:"http://localhost:8081"`
 	AccrualQueueSize       int

@@ -17,16 +17,16 @@ import (
 )
 
 func TestOrdersRepository_Add_OK(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	users := udb.New(pgpool)
+	users := udb.New(db)
 	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 	require.NoError(t, err)
 
 	before := time.Now()
-	repo := odb.New(pgpool)
-	o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID), orders.AddNoop)
+	repo := odb.New(db)
+	o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
 	require.NoError(t, err)
 	assert.True(t, o.ID > 0)
 	assert.Equal(t, "1234567812345670", o.Number)
@@ -35,63 +35,64 @@ func TestOrdersRepository_Add_OK(t *testing.T) {
 }
 
 func TestOrdersRepository_Add_ErrorOnDuplicate(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	users := udb.New(pgpool)
+	users := udb.New(db)
 	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 	require.NoError(t, err)
 
-	repo := odb.New(pgpool)
-	o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID), orders.AddNoop)
+	repo := odb.New(db)
+	o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
 	require.NoError(t, err)
 	assert.True(t, o.ID > 0)
 
-	o, err = repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID), orders.AddNoop)
+	o, err = repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
 	require.ErrorIs(t, err, orders.ErrOrderAlreadyExists)
 	assert.Equal(t, 0, o.ID)
 }
 
 func TestOrdersRepository_Add_ErrorOnForeignKeyMissing(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
-	repo := odb.New(pgpool)
-	o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", 9999999), orders.AddNoop)
+
+	repo := odb.New(db)
+	o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", 9999999))
 	require.Error(t, err)
 	require.ErrorContains(t, err, `violates foreign key constraint "orders_user_id_fk_users"`)
 	assert.Equal(t, 0, o.ID)
 }
 
 func TestOrdersRepository_Add_ErrorOnInvalidStatus(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	users := udb.New(pgpool)
+	users := udb.New(db)
 	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 	require.NoError(t, err)
 
-	repo := odb.New(pgpool)
+	repo := odb.New(db)
 	newOrder := models.NewCandidateOrder("1234567812345670", u.ID)
 	newOrder.Status = "foo"
-	o, err := repo.Add(context.TODO(), newOrder, orders.AddNoop)
+	o, err := repo.Add(context.TODO(), newOrder)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "invalid input value for enum order_status")
 	assert.Equal(t, 0, o.ID)
 }
 
 func TestRepository_GetListForUser_OK(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
 	before := time.Now()
 
-	users := udb.New(pgpool)
+	users := udb.New(db)
 	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 	require.NoError(t, err)
 
-	repo := odb.New(pgpool)
+	repo := odb.New(db)
 	for _, number := range []string{"1234567812345670", "4561261212345467", "49927398716"} {
-		_, err = repo.Add(context.TODO(), models.NewCandidateOrder(number, u.ID), orders.AddNoop)
+		_, err = repo.Add(context.TODO(), models.NewCandidateOrder(number, u.ID))
 		require.NoError(t, err)
 	}
 
@@ -109,26 +110,26 @@ func TestRepository_GetListForUser_OK(t *testing.T) {
 }
 
 func TestRepository_GetListForUser_NoErrorForUnknownUser(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	repo := odb.New(pgpool)
+	repo := odb.New(db)
 	userOrders, err := repo.GetListForUser(context.TODO(), 9999999)
 	require.NoError(t, err)
 	assert.Len(t, userOrders, 0)
 }
 
 func TestRepository_UpdateStatus_OK(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	users := udb.New(pgpool)
+	users := udb.New(db)
 	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 	require.NoError(t, err)
 
-	repo := odb.New(pgpool)
-	o, _ := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID), orders.AddNoop)
-	other, _ := repo.Add(context.TODO(), models.NewCandidateOrder("4561261212345467", u.ID), orders.AddNoop)
+	repo := odb.New(db)
+	o, _ := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
+	other, _ := repo.Add(context.TODO(), models.NewCandidateOrder("4561261212345467", u.ID))
 
 	err = repo.UpdateStatus(context.TODO(), o.ID, models.OrderStatusProcessed, decimal.RequireFromString("100.5"))
 	require.NoError(t, err)
@@ -175,15 +176,15 @@ func TestRepository_UpdateStatus_Errors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pgpool, cancel := testutils.PrepareTestDatabase()
+			_, db, cancel := testutils.PrepareTestDatabase()
 			defer cancel()
 
-			users := udb.New(pgpool)
+			users := udb.New(db)
 			u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 			require.NoError(t, err)
 
-			repo := odb.New(pgpool)
-			o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID), orders.AddNoop)
+			repo := odb.New(db)
+			o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
 			require.NoError(t, err)
 
 			err = repo.UpdateStatus(context.TODO(), o.ID, tt.status, tt.accrual)

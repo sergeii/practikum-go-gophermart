@@ -8,8 +8,8 @@ import (
 
 	appcfg "github.com/sergeii/practikum-go-gophermart/cmd/gophermart/application"
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
+	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest"
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/rest"
 )
 
 type TestServerOpt func(*config.Config)
@@ -23,8 +23,8 @@ func PrepareTestServer(opts ...TestServerOpt) (*httptest.Server, *application.Ap
 		opt(&cfg)
 	}
 	crand.Read(cfg.SecretKey) // nolint: errcheck
-	db, cancelDatabase := PrepareTestDatabase()
-	app, err := appcfg.Configure(cfg, db)
+	pg, _, cancelDatabase := PrepareTestDatabase()
+	app, err := appcfg.Configure(cfg, pg)
 	if err != nil {
 		panic(err)
 	}
@@ -35,7 +35,7 @@ func PrepareTestServer(opts ...TestServerOpt) (*httptest.Server, *application.Ap
 	}
 	ts := httptest.NewServer(router)
 	return ts, app, func() {
-		ts.Close()
-		cancelDatabase()
+		defer cancelDatabase()
+		defer ts.Close()
 	}
 }

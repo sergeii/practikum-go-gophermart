@@ -9,16 +9,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
-	"github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
+	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
 	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
 )
 
 func TestService_RegisterNewUser_OK(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	repo := db.New(pgpool)
+	repo := udb.New(db)
 	svc := account.New(repo, account.WithBcryptPasswordHasher())
 
 	u, err := svc.RegisterNewUser(context.TODO(), "happy_customer", "sup3rS3cr3t")
@@ -69,10 +69,10 @@ func TestService_RegisterNewUser_Errors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pgpool, cancel := testutils.PrepareTestDatabase()
+			_, db, cancel := testutils.PrepareTestDatabase()
 			defer cancel()
 
-			repo := db.New(pgpool)
+			repo := udb.New(db)
 			svc := account.New(repo, account.WithBcryptPasswordHasher())
 
 			_, err := svc.RegisterNewUser(context.TODO(), "happy_customer", "sup3rS3cr3t")
@@ -96,10 +96,10 @@ func TestService_RegisterNewUser_Errors(t *testing.T) {
 }
 
 func TestService_Authenticate_OK(t *testing.T) {
-	pgpool, cancel := testutils.PrepareTestDatabase()
+	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
-	repo := db.New(pgpool)
+	repo := udb.New(db)
 	svc := account.New(repo, account.WithBcryptPasswordHasher())
 
 	u1, err := svc.RegisterNewUser(context.TODO(), "happy_customer", "sup3rS3cr3t")
@@ -148,10 +148,10 @@ func TestService_Authenticate_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pgpool, cancel := testutils.PrepareTestDatabase()
+			_, db, cancel := testutils.PrepareTestDatabase()
 			defer cancel()
 
-			repo := db.New(pgpool)
+			repo := udb.New(db)
 			svc := account.New(repo, account.WithBcryptPasswordHasher())
 			r, err := svc.RegisterNewUser(context.TODO(), "shopper", "sup3rS3cr3t")
 			require.NoError(t, err)

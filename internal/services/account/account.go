@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/rs/zerolog/log"
+	"github.com/shopspring/decimal"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
@@ -12,7 +13,6 @@ import (
 )
 
 var ErrRegisterEmptyPassword = errors.New("cannot register with empty password")
-
 var ErrAuthenticateEmptyPassword = errors.New("cannot login with empty password")
 var ErrAuthenticateInvalidCredentials = errors.New("unable to authenticate user with this login/password")
 
@@ -95,4 +95,20 @@ func (s Service) Authenticate(ctx context.Context, login, password string) (mode
 	}
 
 	return user, nil
+}
+
+func (s Service) AccruePoints(ctx context.Context, userID int, points decimal.Decimal) error {
+	return s.users.AccruePoints(ctx, userID, points)
+}
+
+func (s Service) WithdrawPoints(ctx context.Context, userID int, points decimal.Decimal) error {
+	return s.users.WithdrawPoints(ctx, userID, points)
+}
+
+func (s Service) GetBalance(ctx context.Context, userID int) (models.UserBalance, error) {
+	u, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return models.UserBalance{}, err
+	}
+	return u.Balance, nil
 }

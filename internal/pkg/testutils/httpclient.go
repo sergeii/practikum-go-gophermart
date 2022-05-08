@@ -10,9 +10,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
-	"github.com/sergeii/practikum-go-gophermart/internal/services/rest/middleware/auth"
 )
 
 type TestRequestOpt func(r *http.Request)
@@ -28,7 +28,7 @@ func DoTestRequest(
 	method, path string, body io.Reader,
 	opts ...TestRequestOpt,
 ) (*http.Response, string) {
-	req, err := http.NewRequest(method, ts.URL+path, body)
+	req, err := http.NewRequest(method, ts.URL+path, body) // nolint: noctx
 	require.NoError(t, err)
 
 	for _, opt := range opts {

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,6 +29,15 @@ type registerUserRespSchema struct {
 
 type registerUserRespErrorSchema struct {
 	Error string `json:"error"`
+}
+
+func parseAuthSetCookie(resp *http.Response) *http.Cookie {
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name == "auth" {
+			return cookie
+		}
+	}
+	return nil
 }
 
 func TestHandler_RegisterUser_OK(t *testing.T) {
@@ -284,11 +294,67 @@ func TestHandler_LoginUser_Validation(t *testing.T) {
 	}
 }
 
-func parseAuthSetCookie(resp *http.Response) *http.Cookie {
-	for _, cookie := range resp.Cookies() {
-		if cookie.Name == "auth" {
-			return cookie
-		}
+type showBalanceRespSchema struct {
+	Current   float64 `json:"current"`
+	Withdrawn float64 `json:"withdrawn"`
+}
+
+func TestHandler_ShowUserBalance_OK(t *testing.T) {
+	tests := []struct {
+		name      string
+		current   string
+		withdrawn string
+	}{
+		{
+			"zero points of each",
+			"0",
+			"0",
+		},
+		{
+			"have current but no withdrawn",
+			"100500.1",
+			"0",
+		},
+		{
+			"have a bit of both",
+			"2048.1",
+			"2022.91",
+		},
 	}
-	return nil
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts, app, cancel := testutils.PrepareTestServer()
+			defer cancel()
+
+			current := decimal.RequireFromString(tt.current)
+			withdrawn := decimal.RequireFromString(tt.withdrawn)
+			currentF64, _ := current.Float64()
+			withdrawnF64, _ := withdrawn.Float64()
+
+			u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
+			err := app.UserService.AccruePoints(context.TODO(), u.ID, current.Add(withdrawn))
+			require.NoError(t, err)
+			err = app.UserService.WithdrawPoints(context.TODO(), u.ID, withdrawn)
+			require.NoError(t, err)
+
+			resp, respBody := testutils.DoTestRequest(
+				t, ts, http.MethodGet, "/api/user/balance", nil,
+				testutils.RequestWithUser(u, app),
+			)
+			defer resp.Body.Close()
+			require.Equal(t, 200, resp.StatusCode)
+			var respJSON showBalanceRespSchema
+			json.Unmarshal([]byte(respBody), &respJSON) // nolint:errcheck
+			assert.Equal(t, currentF64, respJSON.Current)
+			assert.Equal(t, withdrawnF64, respJSON.Withdrawn)
+		})
+	}
+}
+
+func TestHandler_ShowUserBalance_RequiresAuth(t *testing.T) {
+	ts, _, cancel := testutils.PrepareTestServer()
+	defer cancel()
+	resp, _ := testutils.DoTestRequest(t, ts, http.MethodGet, "/api/user/balance", nil)
+	defer resp.Body.Close()
+	assert.Equal(t, 401, resp.StatusCode)
 }

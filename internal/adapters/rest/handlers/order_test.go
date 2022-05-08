@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
-	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
@@ -60,7 +59,7 @@ func TestHandler_UploadOrder_OK(t *testing.T) {
 	assert.True(t, respJSON.Result.UploadedAt.Before(time.Now()))
 
 	// order is added to the processing queue
-	qLen, _ := app.ProcessingService.QueueLength(context.TODO())
+	qLen, _ := app.OrderService.ProcessingLength(context.TODO())
 	assert.Equal(t, 1, qLen)
 
 	// duplicate request is handled
@@ -74,7 +73,7 @@ func TestHandler_UploadOrder_OK(t *testing.T) {
 	assert.Equal(t, "", respBody)
 
 	// duplicate order is NOT added to the processing queue
-	qLen, _ = app.ProcessingService.QueueLength(context.TODO())
+	qLen, _ = app.OrderService.ProcessingLength(context.TODO())
 	assert.Equal(t, 1, qLen)
 }
 
@@ -128,7 +127,7 @@ func TestHandler_UploadOrder_Validation(t *testing.T) {
 			)
 			defer resp.Body.Close()
 			userOrders, _ := app.OrderService.GetUserOrders(context.TODO(), u.ID)
-			qLen, _ := app.ProcessingService.QueueLength(context.TODO())
+			qLen, _ := app.OrderService.ProcessingLength(context.TODO())
 			if tt.want {
 				assert.Len(t, userOrders, 1)
 				assert.Equal(t, 1, qLen)
@@ -293,13 +292,13 @@ func TestHandler_ListUserOrders_OK(t *testing.T) {
 	defer cancel()
 
 	other, _ := app.UserService.RegisterNewUser(context.TODO(), "other", "secret")
-	_, err := app.OrderService.UploadOrder(context.TODO(), "79927398713", other.ID, orders.AddNoop)
+	_, err := app.OrderService.SubmitNewOrder(context.TODO(), "79927398713", other.ID)
 	require.NoError(t, err)
 
 	u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
-	app.OrderService.UploadOrder(context.TODO(), "4561261212345467", u.ID, orders.AddNoop) // nolint:errcheck
-	app.OrderService.UploadOrder(context.TODO(), "49927398716", u.ID, orders.AddNoop)      // nolint:errcheck
-	app.OrderService.UpdateOrder(                                                          // nolint:errcheck
+	app.OrderService.SubmitNewOrder(context.TODO(), "4561261212345467", u.ID) // nolint:errcheck
+	app.OrderService.SubmitNewOrder(context.TODO(), "49927398716", u.ID)      // nolint:errcheck
+	app.OrderService.UpdateOrderStatus(                                       // nolint:errcheck
 		context.TODO(), "49927398716",
 		models.OrderStatusProcessed, decimal.RequireFromString("10.1"),
 	)
@@ -327,7 +326,7 @@ func TestHandler_ListUserOrders_NoOrdersForUser(t *testing.T) {
 	defer cancel()
 
 	other, _ := app.UserService.RegisterNewUser(context.TODO(), "other", "secret")
-	_, err := app.OrderService.UploadOrder(context.TODO(), "79927398713", other.ID, orders.AddNoop)
+	_, err := app.OrderService.SubmitNewOrder(context.TODO(), "79927398713", other.ID)
 	require.NoError(t, err)
 
 	u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
