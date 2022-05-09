@@ -222,7 +222,7 @@ func (s *Service) handleProcessingError(ctx context.Context, err error, orderNum
 	if errors.As(err, &tooManyReqs) {
 		log.Info().
 			Err(err).Str("order", orderNumber).Uint("wait", tooManyReqs.RetryAfter).
-			Msg("accrual system is busy")
+			Msg("Accrual system is busy")
 		return time.After(time.Second * time.Duration(tooManyReqs.RetryAfter)), tooManyReqs
 	}
 	log.Error().Err(err).Str("order", orderNumber).Msg("Failed to check order status at accrual system")

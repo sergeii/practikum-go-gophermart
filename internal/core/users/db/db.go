@@ -101,10 +101,10 @@ func (r Repository) GetByLogin(ctx context.Context, login string) (models.User, 
 		&user.Balance.Current, &user.Balance.Withdrawn,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Debug().Str("login", login).Msg("user not found")
+			log.Debug().Str("login", login).Msg("User not found")
 			return models.User{}, users.ErrUserNotFoundInRepo
 		}
-		log.Error().Err(err).Str("login", login).Msg("failed to query user by login")
+		log.Error().Err(err).Str("login", login).Msg("Failed to query user by login")
 		return models.User{}, err
 	}
 
@@ -134,7 +134,7 @@ func (r Repository) AccruePoints(ctx context.Context, userID int, points decimal
 			Stringer("points", points).
 			Stringer("before", oldCurrent).
 			Stringer("after", newCurrent).
-			Msg("points accrued for user")
+			Msg("Points accrued for user")
 		return nil
 	})
 }
@@ -178,7 +178,7 @@ func (r Repository) WithdrawPoints(ctx context.Context, userID int, points decim
 			Stringer("withdrawnAfter", newWithdrawn).
 			Stringer("currentBefore", oldCurrent).
 			Stringer("currentAfter", newCurrent).
-			Msg("points withdrawn for user")
+			Msg("Points withdrawn for user")
 		return nil
 	})
 }

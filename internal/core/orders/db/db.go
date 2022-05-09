@@ -105,7 +105,7 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Or
 		userID,
 	)
 	if err != nil {
-		log.Error().Err(err).Int("userID", userID).Msg("failed to query orders for user")
+		log.Error().Err(err).Int("userID", userID).Msg("Failed to query orders for user")
 		return nil, err
 	}
 	defer rows.Close()
@@ -115,7 +115,7 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Or
 		row := orderRow{}
 		err = rows.Scan(&row.ID, &row.UploadedAt, &row.Status, &row.Accrual, &row.Number, &row.UserID)
 		if err != nil {
-			log.Error().Err(err).Int("userID", userID).Msg("failed to scan order row")
+			log.Error().Err(err).Int("userID", userID).Msg("Failed to scan order row")
 			return nil, err
 		}
 		items = append(
@@ -125,7 +125,7 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Or
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Error().Err(err).Int("userID", userID).Msg("failed to fetch orders for user")
+		log.Error().Err(err).Int("userID", userID).Msg("Failed to fetch orders for user")
 		return nil, err
 	}
 

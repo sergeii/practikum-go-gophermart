@@ -22,7 +22,7 @@ func Configure(cfg config.Config) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	// run initial migrations when running tests on github
+	// apply migrations when running e2e tests
 	if dsn.Path == "/praktikum" {
 		if err = autoMigrate(cfg.DatabaseDSN); err != nil {
 			panic(err)

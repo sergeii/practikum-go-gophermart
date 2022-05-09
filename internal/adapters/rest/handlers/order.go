@@ -34,14 +34,14 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 	if err != nil {
 		log.Error().
 			Err(err).Str("path", c.FullPath()).
-			Msg("encountered an error while obtaining order number")
+			Msg("Encountered an error while obtaining order number")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	// the order number is passed in body in plaintext
 	orderNumber := strings.TrimSpace(string(body))
 	if orderNumber == "" {
-		log.Debug().Err(err).Str("path", c.FullPath()).Msg("missing order number")
+		log.Debug().Err(err).Str("path", c.FullPath()).Msg("Missing order number")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "order number is required"})
 		return
 	}
@@ -50,7 +50,7 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 	if err = binding.Validator.ValidateStruct(uploadOrderField{orderNumber}); err != nil {
 		log.Debug().
 			Err(err).Str("path", c.FullPath()).Str("number", orderNumber).
-			Msg("invalid order number format")
+			Msg("Invalid order number format")
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "order number does not conform the format"})
 		return
 	}
@@ -95,7 +95,7 @@ func (h *Handler) ListUserOrders(c *gin.Context) {
 	if err != nil {
 		log.Warn().
 			Err(err).Str("path", c.FullPath()).Int("userID", user.ID).
-			Msg("unable to fetch orders for user")
+			Msg("Unable to fetch orders for user")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

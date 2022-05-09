@@ -44,7 +44,7 @@ func TestHandler_RegisterUser_OK(t *testing.T) {
 
 	var respJSON registerUserRespSchema
 	resp, _ := testutils.DoTestRequest(
-		t, ts, http.MethodPost, "/api/user/register",
+		ts, http.MethodPost, "/api/user/register",
 		testutils.JSONReader(registerUserReqSchema{Login: "happy_shopper", Password: "secret"}),
 		testutils.MustBindJSON(&respJSON),
 	)
@@ -143,7 +143,7 @@ func TestHandler_RegisterUser_Validation(t *testing.T) {
 			require.NoError(t, err)
 
 			resp, respBody := testutils.DoTestRequest(
-				t, ts, http.MethodPost, "/api/user/register",
+				ts, http.MethodPost, "/api/user/register",
 				testutils.JSONReader(registerUserReqSchema{Login: tt.login, Password: tt.password}),
 			)
 			resp.Body.Close()
@@ -180,7 +180,7 @@ func TestHandler_LoginUser_OK(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, _ := testutils.DoTestRequest(
-		t, ts, http.MethodPost, "/api/user/login", testutils.JSONReader(
+		ts, http.MethodPost, "/api/user/login", testutils.JSONReader(
 			loginUserReqSchema{Login: "happy_shopper", Password: "super_secret"},
 		),
 	)
@@ -279,7 +279,7 @@ func TestHandler_LoginUser_Validation(t *testing.T) {
 			require.NoError(t, err)
 
 			resp, respBody := testutils.DoTestRequest(
-				t, ts, http.MethodPost, "/api/user/login",
+				ts, http.MethodPost, "/api/user/login",
 				testutils.JSONReader(loginUserReqSchema{Login: tt.login, Password: tt.password}),
 			)
 			if tt.wantSuccess {

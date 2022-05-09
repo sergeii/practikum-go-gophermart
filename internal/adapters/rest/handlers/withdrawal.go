@@ -35,7 +35,7 @@ func (h *Handler) RequestWithdrawal(c *gin.Context) {
 	if err := c.ShouldBindJSON(&json); err != nil {
 		log.Debug().
 			Err(err).Str("path", c.FullPath()).Int("userID", user.ID).
-			Msg("unable to validate withdrawal request")
+			Msg("Unable to validate withdrawal request")
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}
@@ -85,7 +85,7 @@ func (h *Handler) ListUserWithdrawals(c *gin.Context) {
 	if err != nil {
 		log.Warn().
 			Err(err).Str("path", c.FullPath()).Int("userID", user.ID).
-			Msg("unable to fetch withdrawalss for user")
+			Msg("Unable to fetch withdrawals for user")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

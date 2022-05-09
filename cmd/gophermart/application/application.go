@@ -19,7 +19,7 @@ import (
 func Configure(cfg config.Config, pgpool *pgxpool.Pool) (*application.App, error) {
 	accrualService, err := accrual.New(cfg.AccrualSystemURL)
 	if err != nil {
-		log.Error().Err(err).Msg("unable to configure accrual service")
+		log.Error().Err(err).Msg("Unable to configure accrual service")
 		return nil, err
 	}
 

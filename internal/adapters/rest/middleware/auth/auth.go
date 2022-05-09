@@ -69,7 +69,7 @@ func Authentication(cfg config.Config) gin.HandlerFunc {
 			}
 			log.Debug().
 				Int("userID", user.ID).Str("login", user.Login).
-				Msg("successfully authenticated user")
+				Msg("Successfully authenticated user")
 			c.Set(ContextKey, user)
 		} else {
 			log.Warn().Msg("Failed to obtain token claims")

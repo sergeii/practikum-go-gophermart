@@ -28,7 +28,7 @@ type RegisterUserResp struct {
 func (h *Handler) RegisterUser(c *gin.Context) {
 	var json RegisterUserReq
 	if err := c.ShouldBindJSON(&json); err != nil {
-		log.Debug().Err(err).Str("path", c.FullPath()).Msg("unable to parse register request")
+		log.Debug().Err(err).Str("path", c.FullPath()).Msg("Unable to parse register request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -42,12 +42,12 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 		if errors.Is(err, users.ErrUserLoginIsOccupied) {
 			log.Debug().
 				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
-				Msg("unable to register user due to conflict")
+				Msg("Unable to register user due to conflict")
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		} else {
 			log.Error().
 				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
-				Msg("unable to register user due to error")
+				Msg("Unable to register user due to error")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
 		return
@@ -55,12 +55,12 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 
 	log.Info().
 		Str("path", c.FullPath()).Int("id", u.ID).Str("login", u.Login).
-		Msg("registered new user")
+		Msg("Registered new user")
 
 	if err := h.setAuthCookie(c, u); err != nil {
 		log.Error().
 			Err(err).Str("path", c.FullPath()).Str("login", json.Login).
-			Msg("failed to set auth cookie")
+			Msg("Failed to set auth cookie")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -76,7 +76,7 @@ func (h *Handler) LoginUser(c *gin.Context) {
 	var json LoginUserReq
 
 	if err := c.ShouldBindJSON(&json); err != nil {
-		log.Debug().Err(err).Str("path", c.FullPath()).Msg("unable to parse login request")
+		log.Debug().Err(err).Str("path", c.FullPath()).Msg("Unable to parse login request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -87,15 +87,15 @@ func (h *Handler) LoginUser(c *gin.Context) {
 		case errors.Is(err, account.ErrAuthenticateInvalidCredentials):
 			log.Debug().
 				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
-				Msg("unable to login user due to login/password mismatch")
+				Msg("Unable to login user due to login/password mismatch")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		case errors.Is(err, account.ErrAuthenticateEmptyPassword):
-			log.Debug().Err(err).Str("path", c.FullPath()).Msg("unable to login user with empty password")
+			log.Debug().Err(err).Str("path", c.FullPath()).Msg("Unable to login user with empty password")
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		default:
 			log.Error().
 				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
-				Msg("unable to register user due to error")
+				Msg("Unable to register user due to error")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
 		return
@@ -103,12 +103,12 @@ func (h *Handler) LoginUser(c *gin.Context) {
 
 	log.Info().
 		Str("path", c.FullPath()).Int("id", u.ID).Str("login", u.Login).
-		Msg("user logged in")
+		Msg("User logged in")
 
 	if err := h.setAuthCookie(c, u); err != nil {
 		log.Error().
 			Err(err).Str("path", c.FullPath()).Str("login", json.Login).
-			Msg("failed to set auth cookie")
+			Msg("Failed to set authentication cookie")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

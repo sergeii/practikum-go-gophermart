@@ -45,7 +45,7 @@ func TestHandler_UploadOrder_OK(t *testing.T) {
 	before := time.Now()
 	var respJSON uploadOrderRespSchema
 	resp, _ := testutils.DoTestRequest(
-		t, ts, http.MethodPost,
+		ts, http.MethodPost,
 		"/api/user/orders", strings.NewReader("1234567812345670"),
 		testutils.WithUser(u, app),
 		testutils.MustBindJSON(&respJSON),
@@ -63,7 +63,7 @@ func TestHandler_UploadOrder_OK(t *testing.T) {
 
 	// duplicate request is handled
 	resp, respBody := testutils.DoTestRequest(
-		t, ts, http.MethodPost,
+		ts, http.MethodPost,
 		"/api/user/orders", strings.NewReader("1234567812345670"),
 		testutils.WithUser(u, app),
 	)
@@ -120,7 +120,7 @@ func TestHandler_UploadOrder_Validation(t *testing.T) {
 			defer cancel()
 			u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
 			resp, _ := testutils.DoTestRequest(
-				t, ts, http.MethodPost,
+				ts, http.MethodPost,
 				"/api/user/orders", strings.NewReader(tt.number),
 				testutils.WithUser(u, app),
 			)
@@ -146,7 +146,7 @@ func TestHandler_UploadOrder_ErrorOnDuplicate(t *testing.T) {
 	u1, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
 	u2, _ := app.UserService.RegisterNewUser(context.TODO(), "other", "strong")
 	resp, _ := testutils.DoTestRequest(
-		t, ts, http.MethodPost,
+		ts, http.MethodPost,
 		"/api/user/orders", strings.NewReader("1234567812345670"),
 		testutils.WithUser(u1, app),
 	)
@@ -155,7 +155,7 @@ func TestHandler_UploadOrder_ErrorOnDuplicate(t *testing.T) {
 
 	var respJSON uploadOrderErrorSchema
 	resp, _ = testutils.DoTestRequest(
-		t, ts, http.MethodPost,
+		ts, http.MethodPost,
 		"/api/user/orders", strings.NewReader("1234567812345670"),
 		testutils.WithUser(u2, app),
 		testutils.MustBindJSON(&respJSON),
@@ -209,7 +209,7 @@ func TestHandler_UploadOrder_LuhnValidation(t *testing.T) {
 			defer cancel()
 			u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
 			resp, _ := testutils.DoTestRequest(
-				t, ts, http.MethodPost,
+				ts, http.MethodPost,
 				"/api/user/orders", strings.NewReader(tt.number),
 				testutils.WithUser(u, app),
 			)
@@ -252,7 +252,7 @@ func TestHandler_UploadOrder_ErrorWhenQueueIsFull(t *testing.T) {
 			u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
 
 			resp, _ := testutils.DoTestRequest(
-				t, ts, http.MethodPost,
+				ts, http.MethodPost,
 				"/api/user/orders", strings.NewReader("1234567812345670"),
 				testutils.WithUser(u, app),
 			)
@@ -260,7 +260,7 @@ func TestHandler_UploadOrder_ErrorWhenQueueIsFull(t *testing.T) {
 			assert.Equal(t, 202, resp.StatusCode)
 
 			resp, _ = testutils.DoTestRequest(
-				t, ts, http.MethodPost,
+				ts, http.MethodPost,
 				"/api/user/orders", strings.NewReader("79927398713"),
 				testutils.WithUser(u, app),
 			)
@@ -278,10 +278,7 @@ func TestHandler_UploadOrder_ErrorWhenQueueIsFull(t *testing.T) {
 func TestHandler_UploadOrder_RequiresAuth(t *testing.T) {
 	ts, _, cancel := testutils.PrepareTestServer()
 	defer cancel()
-	resp, _ := testutils.DoTestRequest(
-		t, ts, http.MethodPost,
-		"/api/user/orders", strings.NewReader("100500"),
-	)
+	resp, _ := testutils.DoTestRequest(ts, http.MethodPost, "/api/user/orders", strings.NewReader("100500"))
 	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }
@@ -304,7 +301,7 @@ func TestHandler_ListUserOrders_OK(t *testing.T) {
 
 	jsonItems := make([]listOrderItemSchema, 0)
 	resp, _ := testutils.DoTestRequest(
-		t, ts, http.MethodGet, "/api/user/orders", nil,
+		ts, http.MethodGet, "/api/user/orders", nil,
 		testutils.WithUser(u, app),
 		testutils.MustBindJSON(&jsonItems),
 	)
@@ -329,7 +326,7 @@ func TestHandler_ListUserOrders_NoOrdersForUser(t *testing.T) {
 
 	u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
 	resp, _ := testutils.DoTestRequest(
-		t, ts, http.MethodGet, "/api/user/orders", nil,
+		ts, http.MethodGet, "/api/user/orders", nil,
 		testutils.WithUser(u, app),
 	)
 	resp.Body.Close()
@@ -339,7 +336,7 @@ func TestHandler_ListUserOrders_NoOrdersForUser(t *testing.T) {
 func TestHandler_ListUserOrders_RequiresAuth(t *testing.T) {
 	ts, _, cancel := testutils.PrepareTestServer()
 	defer cancel()
-	resp, _ := testutils.DoTestRequest(t, ts, http.MethodGet, "/api/user/orders", nil)
+	resp, _ := testutils.DoTestRequest(ts, http.MethodGet, "/api/user/orders", nil)
 	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }

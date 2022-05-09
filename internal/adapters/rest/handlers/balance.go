@@ -22,7 +22,7 @@ func (h *Handler) ShowUserBalance(c *gin.Context) {
 	if err != nil {
 		log.Error().
 			Err(err).Str("path", c.FullPath()).Int("userID", u.ID).
-			Msg("unable to show user balance due to error")
+			Msg("Unable to show user balance due to error")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}
 	c.JSON(http.StatusOK, UserBalanceResp{

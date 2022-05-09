@@ -81,7 +81,7 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Wi
 		userID,
 	)
 	if err != nil {
-		log.Error().Err(err).Int("userID", userID).Msg("failed to query withdrawals for user")
+		log.Error().Err(err).Int("userID", userID).Msg("Failed to query withdrawals for user")
 		return nil, err
 	}
 	defer rows.Close()
@@ -91,7 +91,7 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Wi
 		row := withdrawalRow{}
 		err = rows.Scan(&row.ID, &row.ProcessedAt, &row.Sum, &row.Number, &row.UserID)
 		if err != nil {
-			log.Error().Err(err).Int("userID", userID).Msg("failed to read withdrawals for user")
+			log.Error().Err(err).Int("userID", userID).Msg("Failed to read withdrawals for user")
 			return nil, err
 		}
 		items = append(
@@ -101,7 +101,7 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Wi
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Error().Err(err).Int("userID", userID).Msg("failed to fetch withdrawals for user")
+		log.Error().Err(err).Int("userID", userID).Msg("Failed to fetch withdrawals for user")
 		return nil, err
 	}
 

@@ -56,7 +56,7 @@ func (s Service) RegisterNewUser(ctx context.Context, login, password string) (m
 	// store a password hash instead of the plain password
 	hashedPassword, err := s.hasher.Hash(password)
 	if err != nil {
-		log.Debug().Err(err).Str("login", login).Msg("unable to hash password")
+		log.Debug().Err(err).Str("login", login).Msg("Unable to hash password")
 		return models.User{}, err
 	}
 
@@ -88,9 +88,9 @@ func (s Service) Authenticate(ctx context.Context, login, password string) (mode
 
 	passwordsMatch, err := s.hasher.Check(password, user.Password)
 	if err != nil {
-		log.Error().Err(err).Str("login", login).Msg("unable to check password")
+		log.Error().Err(err).Str("login", login).Msg("Unable to check password")
 	} else if !passwordsMatch {
-		log.Debug().Str("login", login).Msg("password does not match")
+		log.Debug().Str("login", login).Msg("Password does not match")
 		return models.User{}, ErrAuthenticateInvalidCredentials
 	}
 

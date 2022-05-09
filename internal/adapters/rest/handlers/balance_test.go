@@ -61,7 +61,7 @@ func TestHandler_ShowUserBalance_OK(t *testing.T) {
 
 			var respJSON showBalanceRespSchema
 			resp, _ := testutils.DoTestRequest(
-				t, ts, http.MethodGet, "/api/user/balance", nil,
+				ts, http.MethodGet, "/api/user/balance", nil,
 				testutils.WithUser(u, app),
 				testutils.MustBindJSON(&respJSON),
 			)
@@ -76,7 +76,7 @@ func TestHandler_ShowUserBalance_OK(t *testing.T) {
 func TestHandler_ShowUserBalance_RequiresAuth(t *testing.T) {
 	ts, _, cancel := testutils.PrepareTestServer()
 	defer cancel()
-	resp, _ := testutils.DoTestRequest(t, ts, http.MethodGet, "/api/user/balance", nil)
+	resp, _ := testutils.DoTestRequest(ts, http.MethodGet, "/api/user/balance", nil)
 	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }

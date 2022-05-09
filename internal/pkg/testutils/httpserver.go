@@ -15,14 +15,18 @@ import (
 type TestServerOpt func(*config.Config)
 
 func PrepareTestServer(opts ...TestServerOpt) (*httptest.Server, *application.App, func()) {
+	secretKey := make([]byte, 32)
+	if _, err := crand.Read(secretKey); err != nil {
+		panic(err)
+	}
 	cfg := config.Config{
 		AccrualSystemURL: "http://localhost:8081",
 		AccrualQueueSize: 10,
+		SecretKey:        secretKey,
 	}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	crand.Read(cfg.SecretKey) // nolint: errcheck
 	pg, _, cancelDatabase := PrepareTestDatabase()
 	app, err := appcfg.Configure(cfg, pg)
 	if err != nil {

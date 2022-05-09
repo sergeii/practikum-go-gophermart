@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"testing"
 	"time"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
@@ -40,9 +39,7 @@ func MustBindJSON(v interface{}) TestRequestOpt {
 }
 
 func DoTestRequest(
-	t *testing.T, ts *httptest.Server,
-	method, path string, body io.Reader,
-	opts ...TestRequestOpt,
+	ts *httptest.Server, method, path string, body io.Reader, opts ...TestRequestOpt,
 ) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, body) // nolint: noctx
 	if err != nil {
