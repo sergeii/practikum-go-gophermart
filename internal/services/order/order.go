@@ -213,7 +213,7 @@ func (s *Service) handleProcessingError(ctx context.Context, err error, orderNum
 		if updErr != nil {
 			log.Error().
 				Err(updErr).Str("order", orderNumber).
-				Msgf("Failed to mark unknown order invalid")
+				Msg("Failed to mark unknown order invalid")
 			return nil, updErr
 		}
 		return nil, ErrOrderProcessingErrorIsHandled
@@ -271,6 +271,6 @@ func (s *Service) maybeResubmitOrder(ctx context.Context, orderNumber string) {
 		log.Error().
 			Err(err).
 			Str("order", orderNumber).
-			Msgf("Unable to return order to queue")
+			Msg("Unable to return order to queue")
 	}
 }
