@@ -8,65 +8,68 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/pkg/security/hasher"
 )
 
 var ErrRegisterEmptyPassword = errors.New("cannot register with empty password")
+var ErrRegisterLoginOccupied = errors.New("login is occupied by another user")
+
 var ErrAuthenticateEmptyPassword = errors.New("cannot login with empty password")
 var ErrAuthenticateInvalidCredentials = errors.New("unable to authenticate user with this login/password")
+
+var ErrWithdrawInvalidSum = errors.New("user can withdraw positive sum only")
 
 type Service struct {
 	users  users.Repository
 	hasher hasher.PasswordHasher
 }
 
-func New(repo users.Repository, ph hasher.PasswordHasher) Service {
+func New(repo users.Repository, hasher hasher.PasswordHasher) Service {
 	return Service{
 		users:  repo,
-		hasher: ph,
+		hasher: hasher,
 	}
 }
 
 // RegisterNewUser attempts to register a new user with the current repository.
 // Before saving the user into the repository, the raw password is hashed using the service configured hasher.
 // The user is therefore saved with their password hashed
-func (s Service) RegisterNewUser(ctx context.Context, login, password string) (models.User, error) {
+func (s Service) RegisterNewUser(ctx context.Context, login, password string) (users.User, error) {
 	// must not register with empty password
 	if password == "" {
-		return models.User{}, ErrRegisterEmptyPassword
+		return users.Blank, ErrRegisterEmptyPassword
+	}
+	// check whether a user with this login already exists
+	if _, err := s.users.GetByLogin(ctx, login); err == nil {
+		return users.Blank, ErrRegisterLoginOccupied
 	}
 	// store a password hash instead of the plain password
 	hashedPassword, err := s.hasher.Hash(password)
 	if err != nil {
 		log.Debug().Err(err).Str("login", login).Msg("Unable to hash password")
-		return models.User{}, err
+		return users.Blank, err
 	}
 
-	newUser := models.User{Login: login, Password: hashedPassword}
+	newUser := users.New(login, hashedPassword)
 	u, err := s.users.Create(ctx, newUser)
 	if err != nil {
-		if errors.Is(err, users.ErrUserLoginIsOccupied) {
-			return models.User{}, err
-		}
-		return models.User{}, err
+		return users.Blank, err
 	}
 	return u, nil
 }
 
 // Authenticate attempts to log in a user using provided credentials
-func (s Service) Authenticate(ctx context.Context, login, password string) (models.User, error) {
+func (s Service) Authenticate(ctx context.Context, login, password string) (users.User, error) {
 	// prevent logging in with an empty password
 	if password == "" {
-		return models.User{}, ErrAuthenticateEmptyPassword
+		return users.Blank, ErrAuthenticateEmptyPassword
 	}
-
 	user, err := s.users.GetByLogin(ctx, login)
 	if err != nil {
-		if errors.Is(err, users.ErrUserNotFoundInRepo) {
-			return models.User{}, ErrAuthenticateInvalidCredentials
+		if errors.Is(err, users.ErrUserNotFound) {
+			return users.Blank, ErrAuthenticateInvalidCredentials
 		}
-		return models.User{}, err
+		return users.Blank, err
 	}
 
 	passwordsMatch, err := s.hasher.Check(password, user.Password)
@@ -74,7 +77,7 @@ func (s Service) Authenticate(ctx context.Context, login, password string) (mode
 		log.Error().Err(err).Str("login", login).Msg("Unable to check password")
 	} else if !passwordsMatch {
 		log.Debug().Str("login", login).Msg("Password does not match")
-		return models.User{}, ErrAuthenticateInvalidCredentials
+		return users.Blank, ErrAuthenticateInvalidCredentials
 	}
 
 	return user, nil
@@ -84,14 +87,22 @@ func (s Service) AccruePoints(ctx context.Context, userID int, points decimal.De
 	return s.users.AccruePoints(ctx, userID, points)
 }
 
+// WithdrawPoints attempts to withdraw specified amount of points from the user's current balance
+// incrementing the amount of withdrawn points and deducting the amount of current points.
+// Since you cannot withdraw more than you have, an error is returned if such an attempt is made
 func (s Service) WithdrawPoints(ctx context.Context, userID int, points decimal.Decimal) error {
+	// cannot withdraw negative sums
+	if points.LessThanOrEqual(decimal.Zero) {
+		return ErrWithdrawInvalidSum
+	}
 	return s.users.WithdrawPoints(ctx, userID, points)
 }
 
-func (s Service) GetBalance(ctx context.Context, userID int) (models.UserBalance, error) {
+// GetBalance returns specified user's balance
+func (s Service) GetBalance(ctx context.Context, userID int) (users.UserBalance, error) {
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {
-		return models.UserBalance{}, err
+		return users.Blank.Balance, err
 	}
 	return u.Balance, nil
 }

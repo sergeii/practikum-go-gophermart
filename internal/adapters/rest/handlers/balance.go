@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/pkg/encode"
 )
 
@@ -17,7 +17,7 @@ type UserBalanceResp struct {
 }
 
 func (h *Handler) ShowUserBalance(c *gin.Context) {
-	u := c.MustGet(auth.ContextKey).(models.User) // nolint: forcetypeassert
+	u := c.MustGet(auth.ContextKey).(users.User) // nolint: forcetypeassert
 	balance, err := h.app.UserService.GetBalance(c.Request.Context(), u.ID)
 	if err != nil {
 		log.Error().

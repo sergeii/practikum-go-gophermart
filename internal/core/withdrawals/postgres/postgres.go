@@ -2,13 +2,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/shopspring/decimal"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/persistence/postgres"
 )
 
@@ -28,30 +29,11 @@ func New(db *postgres.Database) Repository {
 	return Repository{db}
 }
 
-func (r Repository) Add(ctx context.Context, cw models.Withdrawal) (models.Withdrawal, error) {
+func (r Repository) Add(ctx context.Context, cw withdrawals.Withdrawal) (withdrawals.Withdrawal, error) {
 	conn := r.db.Conn(ctx)
-	// check whether a withdrawal with the same number has already been registered
-	var exists bool
-	err := conn.
-		QueryRow(ctx, "SELECT EXISTS(SELECT id FROM withdrawals WHERE number=$1)", cw.Number).
-		Scan(&exists)
-	if err != nil {
-		return models.Withdrawal{}, err
-	} else if exists {
-		log.Debug().
-			Str("order", cw.Number).
-			Msg("Withdrawal with same order number already exists in database")
-		return models.Withdrawal{}, withdrawals.ErrWithdrawalAlreadyRegistered
-	}
-
-	// can withdraw a positive sum only
-	if cw.Sum.LessThanOrEqual(decimal.Zero) {
-		return models.Withdrawal{}, withdrawals.ErrWithdrawalMustHavePositiveSum
-	}
-
 	var newWithdrawalID int
 	var actualProcessedAt time.Time
-	err = conn.
+	err := conn.
 		QueryRow(
 			ctx,
 			"INSERT INTO withdrawals (processed_at, user_id, number, sum) "+
@@ -62,10 +44,10 @@ func (r Repository) Add(ctx context.Context, cw models.Withdrawal) (models.Withd
 
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to add withdrawal")
-		return models.Withdrawal{}, err
+		return withdrawals.Blank, err
 	}
 
-	wd := models.NewAcceptedWithdrawal(newWithdrawalID, cw.Number, cw.User.ID, cw.Sum, actualProcessedAt)
+	wd := withdrawals.NewFromRepo(newWithdrawalID, cw.Number, cw.User.ID, cw.Sum, actualProcessedAt)
 	log.Debug().
 		Str("number", wd.Number).Int("ID", newWithdrawalID).
 		Msg("Registered new withdrawal")
@@ -73,8 +55,27 @@ func (r Repository) Add(ctx context.Context, cw models.Withdrawal) (models.Withd
 	return wd, nil
 }
 
-func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Withdrawal, error) {
-	var items []models.Withdrawal
+// GetByNumber attempts to find a withdrawal by an order number associated with it
+func (r Repository) GetByNumber(ctx context.Context, number string) (withdrawals.Withdrawal, error) {
+	var row withdrawalRow
+	result := r.db.Conn(ctx).QueryRow(
+		ctx,
+		"SELECT id, user_id, sum, processed_at FROM withdrawals WHERE number = $1",
+		number,
+	)
+	if err := result.Scan(&row.ID, &row.UserID, &row.Sum, &row.ProcessedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			log.Debug().Str("number", number).Msg("Withdrawal not found in database")
+			return withdrawals.Blank, withdrawals.ErrWithdrawalNotFound
+		}
+		log.Error().Err(err).Str("number", number).Msg("Failed to to retrieve withdrawal by ID")
+		return withdrawals.Blank, err
+	}
+	return withdrawals.NewFromRepo(row.ID, number, row.UserID, row.Sum, row.ProcessedAt), nil
+}
+
+func (r Repository) GetListForUser(ctx context.Context, userID int) ([]withdrawals.Withdrawal, error) {
+	var items []withdrawals.Withdrawal
 	rows, err := r.db.Conn(ctx).Query(
 		ctx,
 		"SELECT id, processed_at, sum, number, user_id FROM withdrawals "+
@@ -96,7 +97,7 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Wi
 		}
 		items = append(
 			items,
-			models.NewAcceptedWithdrawal(row.ID, row.Number, row.UserID, row.Sum, row.ProcessedAt),
+			withdrawals.NewFromRepo(row.ID, row.Number, row.UserID, row.Sum, row.ProcessedAt),
 		)
 	}
 	err = rows.Err()

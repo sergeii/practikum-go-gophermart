@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	urepo "github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals"
 	wdb "github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals/postgres"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
 )
 
@@ -21,14 +21,14 @@ func TestWithdrawalsDatabase_Add_OK(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 
 	before := time.Now()
 	repo := wdb.New(db)
 	w, err := repo.Add(
 		context.TODO(),
-		models.NewCandidateWithdrawal("1234567812345670", u.ID, decimal.RequireFromString("9.99")),
+		withdrawals.New("1234567812345670", u.ID, decimal.RequireFromString("9.99")),
 	)
 	require.NoError(t, err)
 	assert.True(t, w.ID > 0)
@@ -42,14 +42,14 @@ func TestWithdrawalsDatabase_Add_ErrorOnDuplicate(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 
 	before := time.Now()
 	repo := wdb.New(db)
 	w, err := repo.Add(
 		context.TODO(),
-		models.NewCandidateWithdrawal("1234567812345670", u.ID, decimal.RequireFromString("9.99")),
+		withdrawals.New("1234567812345670", u.ID, decimal.RequireFromString("9.99")),
 	)
 	require.NoError(t, err)
 	assert.True(t, w.ID > 0)
@@ -59,9 +59,9 @@ func TestWithdrawalsDatabase_Add_ErrorOnDuplicate(t *testing.T) {
 
 	w2, err := repo.Add(
 		context.TODO(),
-		models.NewCandidateWithdrawal("1234567812345670", u.ID, decimal.RequireFromString("19.99")),
+		withdrawals.New("1234567812345670", u.ID, decimal.RequireFromString("19.99")),
 	)
-	require.ErrorIs(t, err, withdrawals.ErrWithdrawalAlreadyRegistered)
+	assert.ErrorContains(t, err, "duplicate key value violates unique constraint")
 	assert.Equal(t, 0, w2.ID)
 }
 
@@ -72,7 +72,7 @@ func TestWithdrawalsDatabase_Add_ErrorOnForeignKeyMissing(t *testing.T) {
 	repo := wdb.New(db)
 	w, err := repo.Add(
 		context.TODO(),
-		models.NewCandidateWithdrawal("1234567812345670", 999999, decimal.RequireFromString("9.99")),
+		withdrawals.New("1234567812345670", 999999, decimal.RequireFromString("9.99")),
 	)
 	require.Error(t, err)
 	require.ErrorContains(t, err, `violates foreign key constraint "withdrawals_user_id_fk_users"`)
@@ -100,14 +100,14 @@ func TestWithdrawalsDatabase_Add_ErrorOnNegativeSum(t *testing.T) {
 			defer cancel()
 
 			users := udb.New(db)
-			u, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+			u, _ := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 
 			repo := wdb.New(db)
 			w, err := repo.Add(
 				context.TODO(),
-				models.NewCandidateWithdrawal("1234567812345670", u.ID, decimal.RequireFromString(tt.sum)),
+				withdrawals.New("1234567812345670", u.ID, decimal.RequireFromString(tt.sum)),
 			)
-			require.ErrorIs(t, err, withdrawals.ErrWithdrawalMustHavePositiveSum)
+			assert.ErrorContains(t, err, `violates check constraint "withdrawals_sum_check"`)
 			assert.Equal(t, 0, w.ID)
 		})
 	}
@@ -120,13 +120,13 @@ func TestWithdrawalsDatabase_GetListForUser_OK(t *testing.T) {
 	before := time.Now()
 
 	users := udb.New(db)
-	u, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, _ := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 
 	repo := wdb.New(db)
 	for _, number := range []string{"1234567812345670", "4561261212345467", "49927398716"} {
 		_, err := repo.Add(
 			context.TODO(),
-			models.NewCandidateWithdrawal(number, u.ID, decimal.RequireFromString("9.99")),
+			withdrawals.New(number, u.ID, decimal.RequireFromString("9.99")),
 		)
 		require.NoError(t, err)
 	}

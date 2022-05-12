@@ -11,8 +11,7 @@ import (
 
 	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
-	"github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
+	"github.com/sergeii/practikum-go-gophermart/internal/services/withdrawal"
 	"github.com/sergeii/practikum-go-gophermart/pkg/encode"
 )
 
@@ -29,7 +28,7 @@ type WithdrawalResp struct {
 }
 
 func (h *Handler) RequestWithdrawal(c *gin.Context) {
-	user := c.MustGet(auth.ContextKey).(models.User) // nolint: forcetypeassert
+	user := c.MustGet(auth.ContextKey).(users.User) // nolint: forcetypeassert
 
 	var json WithdrawalReq
 	if err := c.ShouldBindJSON(&json); err != nil {
@@ -49,13 +48,11 @@ func (h *Handler) RequestWithdrawal(c *gin.Context) {
 			Str("order", json.Order).Float64("sum", json.Sum).Int("userID", user.ID).
 			Msg("Failed to request withdrawal")
 		switch {
-		case errors.Is(err, withdrawals.ErrWithdrawalAlreadyRegistered):
+		case errors.Is(err, withdrawal.ErrWithdrawalAlreadyRegistered):
 			c.JSON(http.StatusConflict, gin.H{"error": "withdrawal with this order has already been registered"})
-		case errors.Is(err, withdrawals.ErrWithdrawalMustHavePositiveSum):
-			fallthrough
-		case errors.Is(err, users.ErrUserCantWithdrawNegativeSum):
+		case errors.Is(err, withdrawal.ErrWithdrawalInvalidSumSum):
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		case errors.Is(err, users.ErrUserHasInsufficientAccrual):
+		case errors.Is(err, users.ErrUserHasInsufficientBalance):
 			c.JSON(http.StatusPaymentRequired, gin.H{"error": err.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -79,7 +76,7 @@ type ListWithdrawalRespItem struct {
 }
 
 func (h *Handler) ListUserWithdrawals(c *gin.Context) {
-	user := c.MustGet(auth.ContextKey).(models.User) // nolint: forcetypeassert
+	user := c.MustGet(auth.ContextKey).(users.User) // nolint: forcetypeassert
 	userWithdrawals, err := h.app.WithdrawalService.GetUserWithdrawals(c.Request.Context(), user.ID)
 
 	if err != nil {

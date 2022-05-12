@@ -11,12 +11,12 @@ import (
 
 	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 )
 
 type TestRequestOpt func(*http.Request, *http.Response)
 
-func WithUser(u models.User, app *application.App) TestRequestOpt {
+func WithUser(u users.User, app *application.App) TestRequestOpt {
 	return func(req *http.Request, resp *http.Response) {
 		if req != nil {
 			Authenticate(req, app, u)
@@ -75,7 +75,7 @@ func DoTestRequest(
 	return resp, string(respBody)
 }
 
-func Authenticate(r *http.Request, app *application.App, u models.User) *http.Cookie {
+func Authenticate(r *http.Request, app *application.App, u users.User) *http.Cookie {
 	jwtToken, err := auth.GenerateAuthTokenCookie(u, app.Cfg.SecretKey)
 	if err != nil {
 		panic(err)

@@ -12,7 +12,6 @@ import (
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
 )
 
@@ -21,7 +20,7 @@ func TestUsersRepository_Create_OK(t *testing.T) {
 	defer cancel()
 
 	repo := udb.New(db)
-	u, err := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := repo.Create(context.TODO(), users.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 	assert.True(t, u.ID > 0)
 	assert.Equal(t, "happycustomer", u.Login)
@@ -67,16 +66,16 @@ func TestUsersRepository_Create_ErrorOnDuplicate(t *testing.T) {
 			defer cancel()
 
 			repo := udb.New(db)
-			u1, err := repo.Create(context.TODO(), models.User{Login: "foobar", Password: "str0ng"})
+			u1, err := repo.Create(context.TODO(), users.New("foobar", "str0ng"))
 			require.NoError(t, err)
 			assert.True(t, u1.ID > 0)
 
-			u2, err := repo.Create(context.TODO(), models.User{Login: tt.login, Password: "s3cret"})
+			u2, err := repo.Create(context.TODO(), users.New(tt.login, "s3cret"))
 			if tt.wantErr {
-				require.ErrorIs(t, err, users.ErrUserLoginIsOccupied)
+				assert.ErrorContains(t, err, "duplicate key value violates unique constraint")
 				assert.Equal(t, 0, u2.ID)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				assert.True(t, u2.ID > u1.ID)
 			}
 		})
@@ -123,7 +122,7 @@ func TestUsersRepository_Create_FieldsMustNotBeEmpty(t *testing.T) {
 
 			repo := udb.New(db)
 
-			u, err := repo.Create(context.TODO(), models.User{Login: tt.login, Password: tt.password})
+			u, err := repo.Create(context.TODO(), users.New(tt.login, tt.password))
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Equal(t, 0, u.ID)
@@ -140,7 +139,7 @@ func TestUsersRepository_GetByID(t *testing.T) {
 	defer cancel()
 
 	repo := udb.New(db)
-	u, err := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := repo.Create(context.TODO(), users.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 	assert.True(t, u.ID > 0)
 	assert.Equal(t, "happycustomer", u.Login)
@@ -152,7 +151,7 @@ func TestUsersRepository_GetByID(t *testing.T) {
 	assert.Equal(t, "str0ng", u1.Password)
 
 	u2, err := repo.GetByID(context.TODO(), 999999)
-	require.ErrorIs(t, err, users.ErrUserNotFoundInRepo)
+	require.ErrorIs(t, err, users.ErrUserNotFound)
 	assert.Equal(t, 0, u2.ID)
 	assert.Equal(t, "", u2.Login)
 	assert.Equal(t, "", u2.Password)
@@ -163,7 +162,7 @@ func TestUsersRepository_GetByLogin(t *testing.T) {
 	defer cancel()
 
 	repo := udb.New(db)
-	u, err := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := repo.Create(context.TODO(), users.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 	assert.True(t, u.ID > 0)
 	assert.Equal(t, "happycustomer", u.Login)
@@ -175,7 +174,7 @@ func TestUsersRepository_GetByLogin(t *testing.T) {
 	assert.Equal(t, "str0ng", u1.Password)
 
 	u2, err := repo.GetByLogin(context.TODO(), "unknown")
-	require.ErrorIs(t, err, users.ErrUserNotFoundInRepo)
+	require.ErrorIs(t, err, users.ErrUserNotFound)
 	assert.Equal(t, 0, u2.ID)
 	assert.Equal(t, "", u2.Login)
 	assert.Equal(t, "", u2.Password)
@@ -186,7 +185,7 @@ func TestUsersDatabase_AccruePoints_OK(t *testing.T) {
 	defer cancel()
 
 	repo := udb.New(db)
-	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, _ := repo.Create(context.TODO(), users.New("happycustomer", "str0ng"))
 
 	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("10.01"))
 	assert.NoError(t, err)
@@ -202,8 +201,8 @@ func TestUsersDatabase_AccruePoints_Race(t *testing.T) {
 	defer cancel()
 
 	repo := udb.New(db)
-	u1, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
-	u2, _ := repo.Create(context.TODO(), models.User{Login: "othercustomer", Password: "secr3t"})
+	u1, _ := repo.Create(context.TODO(), users.New("happycustomer", "str0ng"))
+	u2, _ := repo.Create(context.TODO(), users.New("othercustomer", "secr3t"))
 
 	queue := []struct {
 		userID int
@@ -241,7 +240,7 @@ func TestUsersDatabase_WithdrawPoints_OK(t *testing.T) {
 	defer cancel()
 
 	repo := udb.New(db)
-	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, _ := repo.Create(context.TODO(), users.New("happycustomer", "str0ng"))
 
 	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("20.01"))
 	assert.NoError(t, err)
@@ -254,30 +253,12 @@ func TestUsersDatabase_WithdrawPoints_OK(t *testing.T) {
 	assert.Equal(t, "0.01", u.Balance.Current.String())
 }
 
-func TestUsersDatabase_WithdrawPoints_CannotWithdrawNegativeSum(t *testing.T) {
-	_, db, cancel := testutils.PrepareTestDatabase()
-	defer cancel()
-
-	repo := udb.New(db)
-	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
-
-	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("50"))
-	assert.NoError(t, err)
-	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("10"))
-	assert.NoError(t, err)
-	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("-10"))
-	assert.ErrorIs(t, err, users.ErrUserCantWithdrawNegativeSum)
-
-	u, _ = repo.GetByID(context.TODO(), u.ID)
-	assert.Equal(t, "40", u.Balance.Current.String())
-}
-
 func TestUsersDatabase_WithdrawPoints_CannotWithdrawMoreThanHave(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
 
 	repo := udb.New(db)
-	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, _ := repo.Create(context.TODO(), users.New("happycustomer", "str0ng"))
 
 	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("20.01"))
 	assert.NoError(t, err)
@@ -286,7 +267,7 @@ func TestUsersDatabase_WithdrawPoints_CannotWithdrawMoreThanHave(t *testing.T) {
 	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("9.99"))
 	assert.NoError(t, err)
 	err = repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("0.02"))
-	assert.ErrorIs(t, err, users.ErrUserHasInsufficientAccrual)
+	assert.ErrorIs(t, err, users.ErrUserHasInsufficientBalance)
 
 	u, _ = repo.GetByID(context.TODO(), u.ID)
 	assert.Equal(t, "0.01", u.Balance.Current.String())
@@ -297,7 +278,7 @@ func TestUsersDatabase_WithdrawPoints_CannotWithdrawMoreThanHave_Race(t *testing
 	defer cancel()
 
 	repo := udb.New(db)
-	u, _ := repo.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, _ := repo.Create(context.TODO(), users.New("happycustomer", "str0ng"))
 
 	err := repo.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("5.0"))
 	assert.NoError(t, err)
@@ -309,7 +290,7 @@ func TestUsersDatabase_WithdrawPoints_CannotWithdrawMoreThanHave_Race(t *testing
 		go func() {
 			err := repo.WithdrawPoints(context.TODO(), u.ID, decimal.RequireFromString("1.5"))
 			if err != nil {
-				assert.ErrorIs(t, err, users.ErrUserHasInsufficientAccrual)
+				assert.ErrorIs(t, err, users.ErrUserHasInsufficientBalance)
 				atomic.AddInt64(&errCount, 1)
 			}
 			wg.Done()

@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 )
 
 const CookieName = "auth"
@@ -26,7 +26,7 @@ type TokenClaims struct {
 	jwt.RegisteredClaims
 }
 
-func GenerateAuthTokenCookie(user models.User, secretKey []byte) (string, error) {
+func GenerateAuthTokenCookie(user users.User, secretKey []byte) (string, error) {
 	claims := TokenClaims{
 		user.ID,
 		user.Login,
@@ -63,10 +63,7 @@ func Authentication(cfg config.Config) gin.HandlerFunc {
 		}
 
 		if claims, ok := token.Claims.(*TokenClaims); token.Valid && ok {
-			user := models.User{
-				ID:    claims.ID,
-				Login: claims.Login,
-			}
+			user := users.NewFromID(claims.ID)
 			log.Debug().
 				Int("userID", user.ID).Str("login", user.Login).
 				Msg("Successfully authenticated user")

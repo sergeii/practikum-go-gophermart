@@ -11,8 +11,8 @@ import (
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
 	odb "github.com/sergeii/practikum-go-gophermart/internal/core/orders/postgres"
+	urepo "github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
 )
 
@@ -21,12 +21,12 @@ func TestOrdersDatabase_Add_OK(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 
 	before := time.Now()
 	repo := odb.New(db)
-	o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
+	o, err := repo.Add(context.TODO(), orders.New("1234567812345670", u.ID))
 	require.NoError(t, err)
 	assert.True(t, o.ID > 0)
 	assert.Equal(t, "1234567812345670", o.Number)
@@ -39,16 +39,16 @@ func TestOrdersDatabase_Add_ErrorOnDuplicate(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 
 	repo := odb.New(db)
-	o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
+	o, err := repo.Add(context.TODO(), orders.New("1234567812345670", u.ID))
 	require.NoError(t, err)
 	assert.True(t, o.ID > 0)
 
-	o, err = repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
-	require.ErrorIs(t, err, orders.ErrOrderAlreadyExists)
+	o, err = repo.Add(context.TODO(), orders.New("1234567812345670", u.ID))
+	assert.ErrorContains(t, err, "duplicate key value violates unique constraint")
 	assert.Equal(t, 0, o.ID)
 }
 
@@ -57,7 +57,7 @@ func TestOrdersDatabase_Add_ErrorOnForeignKeyMissing(t *testing.T) {
 	defer cancel()
 
 	repo := odb.New(db)
-	o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", 9999999))
+	o, err := repo.Add(context.TODO(), orders.New("1234567812345670", 9999999))
 	require.Error(t, err)
 	require.ErrorContains(t, err, `violates foreign key constraint "orders_user_id_fk_users"`)
 	assert.Equal(t, 0, o.ID)
@@ -68,11 +68,11 @@ func TestOrdersDatabase_Add_ErrorOnInvalidStatus(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 
 	repo := odb.New(db)
-	newOrder := models.NewCandidateOrder("1234567812345670", u.ID)
+	newOrder := orders.New("1234567812345670", u.ID)
 	newOrder.Status = "foo"
 	o, err := repo.Add(context.TODO(), newOrder)
 	require.Error(t, err)
@@ -87,12 +87,12 @@ func TestOrdersDatabase_GetListForUser_OK(t *testing.T) {
 	before := time.Now()
 
 	users := udb.New(db)
-	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 
 	repo := odb.New(db)
 	for _, number := range []string{"1234567812345670", "4561261212345467", "49927398716"} {
-		_, err = repo.Add(context.TODO(), models.NewCandidateOrder(number, u.ID))
+		_, err = repo.Add(context.TODO(), orders.New(number, u.ID))
 		require.NoError(t, err)
 	}
 
@@ -100,7 +100,7 @@ func TestOrdersDatabase_GetListForUser_OK(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, userOrders, 3)
 	for _, o := range userOrders {
-		assert.Equal(t, models.OrderStatusNew, o.Status)
+		assert.Equal(t, orders.OrderStatusNew, o.Status)
 		assert.Equal(t, u.ID, o.User.ID)
 		assert.True(t, o.UploadedAt.After(before))
 	}
@@ -124,18 +124,20 @@ func TestOrdersDatabase_UpdateStatus_OK(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 
 	repo := odb.New(db)
-	o, _ := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
-	other, _ := repo.Add(context.TODO(), models.NewCandidateOrder("4561261212345467", u.ID))
+	o, _ := repo.Add(context.TODO(), orders.New("1234567812345670", u.ID))
+	other, _ := repo.Add(context.TODO(), orders.New("4561261212345467", u.ID))
 
-	err = repo.UpdateStatus(context.TODO(), o.ID, models.OrderStatusProcessed, decimal.RequireFromString("100.5"))
+	o.Status = orders.OrderStatusProcessed
+	o.Accrual = decimal.RequireFromString("100.5")
+	err = repo.Update(context.TODO(), o.ID, o)
 	require.NoError(t, err)
 
 	o2, _ := repo.GetByNumber(context.TODO(), "1234567812345670")
-	assert.Equal(t, models.OrderStatusProcessed, o2.Status)
+	assert.Equal(t, orders.OrderStatusProcessed, o2.Status)
 	assert.Equal(t, "100.5", o2.Accrual.String())
 	assert.Equal(t, u.ID, o2.User.ID)                 // does not change
 	assert.Equal(t, o.ID, o2.ID)                      // does not change
@@ -144,32 +146,32 @@ func TestOrdersDatabase_UpdateStatus_OK(t *testing.T) {
 	// other orders are not affected
 	other2, _ := repo.GetByNumber(context.TODO(), "4561261212345467")
 	assert.Equal(t, other.ID, other2.ID)
-	assert.Equal(t, models.OrderStatusNew, other2.Status)
+	assert.Equal(t, orders.OrderStatusNew, other2.Status)
 	assert.Equal(t, decimal.NewFromInt(0), other2.Accrual)
 }
 
-func TestOrdersDatabase_UpdateStatus_Errors(t *testing.T) {
+func TestOrdersDatabase_Update_Errors(t *testing.T) {
 	tests := []struct {
 		name    string
-		status  models.OrderStatus
+		status  orders.OrderStatus
 		accrual decimal.Decimal
 		wantErr bool
 	}{
 		{
 			"positive case",
-			models.OrderStatusProcessed,
+			orders.OrderStatusProcessed,
 			decimal.NewFromInt(100),
 			false,
 		},
 		{
 			"invalid order status",
-			models.OrderStatus("foo"),
+			orders.OrderStatus("foo"),
 			decimal.NewFromInt(100),
 			true,
 		},
 		{
 			"negative accrual value",
-			models.OrderStatusProcessed,
+			orders.OrderStatusProcessed,
 			decimal.NewFromInt(-100),
 			true,
 		},
@@ -180,18 +182,20 @@ func TestOrdersDatabase_UpdateStatus_Errors(t *testing.T) {
 			defer cancel()
 
 			users := udb.New(db)
-			u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+			u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 			require.NoError(t, err)
 
 			repo := odb.New(db)
-			o, err := repo.Add(context.TODO(), models.NewCandidateOrder("1234567812345670", u.ID))
+			o, err := repo.Add(context.TODO(), orders.New("1234567812345670", u.ID))
 			require.NoError(t, err)
 
-			err = repo.UpdateStatus(context.TODO(), o.ID, tt.status, tt.accrual)
+			o.Status = tt.status
+			o.Accrual = tt.accrual
+			err = repo.Update(context.TODO(), o.ID, o)
 			o2, _ := repo.GetByNumber(context.TODO(), "1234567812345670")
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Equal(t, models.OrderStatusNew, o2.Status)
+				assert.Equal(t, orders.OrderStatusNew, o2.Status)
 				assert.Equal(t, decimal.NewFromInt(0), o2.Accrual)
 			} else {
 				require.NoError(t, err)

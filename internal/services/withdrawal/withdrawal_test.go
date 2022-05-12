@@ -13,7 +13,6 @@ import (
 	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
 	wrepo "github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals"
 	wdb "github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals/postgres"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/transactor"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/withdrawal"
 	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
@@ -30,10 +29,10 @@ func TestWithdrawalService_RequestWithdrawal_OK(t *testing.T) {
 
 	users := udb.New(db)
 
-	u1, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u1, _ := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 	err := users.AccruePoints(context.TODO(), u1.ID, decimal.RequireFromString("10"))
 	require.NoError(t, err)
-	u2, _ := users.Create(context.TODO(), models.User{Login: "shopper", Password: "secr3t"})
+	u2, _ := users.Create(context.TODO(), urepo.New("shopper", "secr3t"))
 	err = users.AccruePoints(context.TODO(), u2.ID, decimal.RequireFromString("100"))
 	require.NoError(t, err)
 
@@ -82,8 +81,8 @@ func TestWithdrawalService_RequestWithdrawal_Duplicate(t *testing.T) {
 
 	users := udb.New(db)
 
-	u1, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
-	u2, _ := users.Create(context.TODO(), models.User{Login: "shopper", Password: "secr3t"})
+	u1, _ := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
+	u2, _ := users.Create(context.TODO(), urepo.New("shopper", "secr3t"))
 
 	err := users.AccruePoints(context.TODO(), u1.ID, decimal.RequireFromString("10"))
 	require.NoError(t, err)
@@ -97,7 +96,7 @@ func TestWithdrawalService_RequestWithdrawal_Duplicate(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = ws.RequestWithdrawal(ctx, "1234567812345670", u2.ID, decimal.RequireFromString("0.01"))
-	require.ErrorIs(t, err, wrepo.ErrWithdrawalAlreadyRegistered)
+	require.ErrorIs(t, err, withdrawal.ErrWithdrawalAlreadyRegistered)
 
 	u1, _ = users.GetByID(ctx, u1.ID)
 	assert.Equal(t, "5.01", u1.Balance.Current.String())
@@ -135,7 +134,7 @@ func TestWithdrawalService_RequestWithdrawal_NegativeSum(t *testing.T) {
 
 			users := udb.New(db)
 
-			u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+			u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 			require.NoError(t, err)
 			err = users.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString("10"))
 			require.NoError(t, err)
@@ -144,7 +143,7 @@ func TestWithdrawalService_RequestWithdrawal_NegativeSum(t *testing.T) {
 			ws := newService(withdrawals, users, db)
 
 			_, err = ws.RequestWithdrawal(ctx, "1234567812345670", u.ID, decimal.RequireFromString(tt.sum))
-			require.ErrorIs(t, err, urepo.ErrUserCantWithdrawNegativeSum)
+			require.ErrorIs(t, err, withdrawal.ErrWithdrawalInvalidSumSum)
 
 			u, _ = users.GetByID(ctx, u.ID)
 			assert.Equal(t, "10", u.Balance.Current.String())
@@ -182,7 +181,7 @@ func TestWithdrawalService_RequestWithdrawal_NotEnoughPoints(t *testing.T) {
 
 			users := udb.New(db)
 
-			u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+			u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 			require.NoError(t, err)
 			err = users.AccruePoints(context.TODO(), u.ID, decimal.RequireFromString(tt.initial))
 			require.NoError(t, err)
@@ -193,7 +192,7 @@ func TestWithdrawalService_RequestWithdrawal_NotEnoughPoints(t *testing.T) {
 			_, err = ws.RequestWithdrawal(
 				ctx, "1234567812345670", u.ID, decimal.RequireFromString("10.00001"),
 			)
-			require.ErrorIs(t, err, urepo.ErrUserHasInsufficientAccrual)
+			require.ErrorIs(t, err, urepo.ErrUserHasInsufficientBalance)
 
 			u, _ = users.GetByID(ctx, u.ID)
 			assert.Equal(t, tt.initial, u.Balance.Current.String())

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
 	testutils2 "github.com/sergeii/practikum-go-gophermart/internal/testutils"
 )
 
@@ -295,7 +295,7 @@ func TestHandler_ListUserOrders_OK(t *testing.T) {
 	app.OrderService.SubmitNewOrder(context.TODO(), "49927398716", u.ID)      // nolint:errcheck
 	app.OrderService.UpdateOrderStatus(                                       // nolint:errcheck
 		context.TODO(), "49927398716",
-		models.OrderStatusProcessed, decimal.RequireFromString("10.1"),
+		orders.OrderStatusProcessed, decimal.RequireFromString("10.1"),
 	)
 
 	jsonItems := make([]listOrderItemSchema, 0)

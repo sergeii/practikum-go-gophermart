@@ -15,7 +15,6 @@ import (
 	odb "github.com/sergeii/practikum-go-gophermart/internal/core/orders/postgres"
 	urepo "github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/accrual"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue/memory"
@@ -51,7 +50,7 @@ func TestOrderService_SubmitNewOrder_OK(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	u, err := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, err := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 	require.NoError(t, err)
 
 	orders := odb.New(db)
@@ -82,8 +81,8 @@ func TestOrderService_SubmitNewOrder_Duplicate(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	user1, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
-	user2, _ := users.Create(context.TODO(), models.User{Login: "othercustomer", Password: "secr3t"})
+	user1, _ := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
+	user2, _ := users.Create(context.TODO(), urepo.New("othercustomer", "secr3t"))
 
 	orders := odb.New(db)
 	os := newService(orders, users, db, 10, "")
@@ -108,24 +107,24 @@ func TestOrderService_UpdateOrderStatus_OK(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	u, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, _ := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 
 	orders := odb.New(db)
 	svc := newService(orders, users, db, 10, "")
 
 	o, err := svc.SubmitNewOrder(context.TODO(), "1234567812345670", u.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.OrderStatusNew, o.Status)
+	assert.Equal(t, orepo.OrderStatusNew, o.Status)
 	assert.True(t, decimal.Zero.Equal(o.Accrual))
 
 	err = svc.UpdateOrderStatus(
 		context.TODO(), "1234567812345670",
-		models.OrderStatusProcessed, decimal.RequireFromString("100.5"),
+		orepo.OrderStatusProcessed, decimal.RequireFromString("100.5"),
 	)
 	require.NoError(t, err)
 
 	upd, _ := orders.GetByNumber(context.TODO(), "1234567812345670")
-	assert.Equal(t, models.OrderStatusProcessed, upd.Status)
+	assert.Equal(t, orepo.OrderStatusProcessed, upd.Status)
 	assert.Equal(t, "100.5", upd.Accrual.String())
 
 	u2, _ := users.GetByID(context.TODO(), u.ID)
@@ -142,7 +141,7 @@ func TestOrderService_UpdateOrderStatus_NotFound(t *testing.T) {
 	svc := newService(orders, users, db, 10, "")
 	err := svc.UpdateOrderStatus(
 		context.TODO(), "1234567812345670",
-		models.OrderStatusProcessed, decimal.RequireFromString("100.5"),
+		orepo.OrderStatusProcessed, decimal.RequireFromString("100.5"),
 	)
 	assert.ErrorIs(t, err, orepo.ErrOrderNotFound)
 }
@@ -150,25 +149,25 @@ func TestOrderService_UpdateOrderStatus_NotFound(t *testing.T) {
 func TestOrderService_UpdateOrderStatus_ConstraintErrors(t *testing.T) {
 	tests := []struct {
 		name    string
-		status  models.OrderStatus
+		status  orepo.OrderStatus
 		accrual decimal.Decimal
 		wantErr bool
 	}{
 		{
 			"positive case",
-			models.OrderStatusProcessed,
+			orepo.OrderStatusProcessed,
 			decimal.NewFromInt(100),
 			false,
 		},
 		{
 			"invalid order status",
-			models.OrderStatus("foo"),
+			orepo.OrderStatus("foo"),
 			decimal.NewFromInt(100),
 			true,
 		},
 		{
 			"negative accrual value",
-			models.OrderStatusProcessed,
+			orepo.OrderStatusProcessed,
 			decimal.NewFromInt(-100),
 			true,
 		},
@@ -179,7 +178,7 @@ func TestOrderService_UpdateOrderStatus_ConstraintErrors(t *testing.T) {
 			defer cancel()
 
 			users := udb.New(db)
-			u, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+			u, _ := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 
 			orders := odb.New(db)
 			svc := newService(orders, users, db, 10, "")
@@ -192,7 +191,7 @@ func TestOrderService_UpdateOrderStatus_ConstraintErrors(t *testing.T) {
 			require.Equal(t, o.ID, upd.ID)
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Equal(t, models.OrderStatusNew, upd.Status)
+				assert.Equal(t, orepo.OrderStatusNew, upd.Status)
 				assert.True(t, upd.Accrual.IsZero())
 			} else {
 				require.NoError(t, err)
@@ -245,8 +244,8 @@ func TestOrderService_ProcessNextOrder_Loop(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	user1, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
-	user2, _ := users.Create(context.TODO(), models.User{Login: "othercustomer", Password: "secr3t"})
+	user1, _ := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
+	user2, _ := users.Create(context.TODO(), urepo.New("othercustomer", "secr3t"))
 
 	orders := odb.New(db)
 	os := newService(orders, users, db, 4, ts.URL)
@@ -281,22 +280,22 @@ func TestOrderService_ProcessNextOrder_Loop(t *testing.T) {
 	close(done)
 
 	o1, _ := orders.GetByNumber(context.TODO(), "1234567812345670")
-	assert.Equal(t, models.OrderStatusProcessed, o1.Status)
+	assert.Equal(t, orepo.OrderStatusProcessed, o1.Status)
 	assert.Equal(t, "100.5", o1.Accrual.String())
 	assert.Equal(t, user1.ID, o1.User.ID)
 
 	o2, _ := orders.GetByNumber(context.TODO(), "4561261212345467")
-	assert.Equal(t, models.OrderStatusInvalid, o2.Status)
+	assert.Equal(t, orepo.OrderStatusInvalid, o2.Status)
 	assert.Equal(t, decimal.Zero.String(), o2.Accrual.String())
 	assert.Equal(t, user2.ID, o2.User.ID)
 
 	o3, _ := orders.GetByNumber(context.TODO(), "79927398713")
-	assert.Equal(t, models.OrderStatusProcessed, o3.Status)
+	assert.Equal(t, orepo.OrderStatusProcessed, o3.Status)
 	assert.Equal(t, "47", o3.Accrual.String())
 	assert.Equal(t, user2.ID, o3.User.ID)
 
 	o4, _ := orders.GetByNumber(context.TODO(), "49927398716")
-	assert.Equal(t, models.OrderStatusInvalid, o4.Status)
+	assert.Equal(t, orepo.OrderStatusInvalid, o4.Status)
 	assert.Equal(t, decimal.Zero.String(), o4.Accrual.String())
 	assert.Equal(t, user1.ID, o4.User.ID)
 
@@ -338,7 +337,7 @@ func TestOrderService_ProcessNextOrder_Retry(t *testing.T) {
 	defer cancel()
 
 	users := udb.New(db)
-	u, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
+	u, _ := users.Create(context.TODO(), urepo.New("happycustomer", "str0ng"))
 
 	orders := odb.New(db)
 	os := newService(orders, users, db, 3, ts.URL)
@@ -363,7 +362,7 @@ func TestOrderService_ProcessNextOrder_Retry(t *testing.T) {
 	<-time.After(time.Millisecond * 50)
 
 	o, _ := orders.GetByNumber(context.TODO(), "79927398713")
-	assert.Equal(t, models.OrderStatusProcessed, o.Status)
+	assert.Equal(t, orepo.OrderStatusProcessed, o.Status)
 	assert.Equal(t, "100.5", o.Accrual.String())
 	assert.Equal(t, u.ID, o.User.ID)
 

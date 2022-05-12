@@ -11,7 +11,6 @@ import (
 
 	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
 )
 
@@ -38,7 +37,7 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 		strings.TrimSpace(json.Login),
 		strings.TrimSpace(json.Password),
 	)
-	if errors.Is(err, users.ErrUserLoginIsOccupied) {
+	if errors.Is(err, account.ErrRegisterLoginOccupied) {
 		log.Debug().
 			Err(err).Str("path", c.FullPath()).Str("login", json.Login).
 			Msg("Unable to register user due to conflict")
@@ -115,7 +114,7 @@ func (h *Handler) LoginUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"result": RegisterUserResp{ID: u.ID, Login: u.Login}})
 }
 
-func (h *Handler) setAuthCookie(c *gin.Context, u models.User) error {
+func (h *Handler) setAuthCookie(c *gin.Context, u users.User) error {
 	token, err := auth.GenerateAuthTokenCookie(u, h.app.Cfg.SecretKey)
 	if err != nil {
 		return err

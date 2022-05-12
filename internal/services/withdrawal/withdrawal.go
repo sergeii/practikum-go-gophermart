@@ -2,15 +2,18 @@ package withdrawal
 
 import (
 	"context"
+	"errors"
 
 	"github.com/rs/zerolog/log"
 	"github.com/shopspring/decimal"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/transactor"
 )
+
+var ErrWithdrawalAlreadyRegistered = errors.New("withdrawal for this order has already been registered")
+var ErrWithdrawalInvalidSumSum = errors.New("can withdraw positive sum only")
 
 type Service struct {
 	withdrawals withdrawals.Repository
@@ -37,9 +40,16 @@ func (s Service) RequestWithdrawal(
 	number string,
 	userID int,
 	sum decimal.Decimal,
-) (models.Withdrawal, error) {
-	var withdrawal models.Withdrawal
-
+) (withdrawals.Withdrawal, error) {
+	// check whether a withdrawal with the same number has already been registered
+	if _, err := s.withdrawals.GetByNumber(ctx, number); !errors.Is(err, withdrawals.ErrWithdrawalNotFound) {
+		return withdrawals.Blank, ErrWithdrawalAlreadyRegistered
+	}
+	// must withdraw positive sum only
+	if sum.LessThanOrEqual(decimal.Zero) {
+		return withdrawals.Blank, ErrWithdrawalInvalidSumSum
+	}
+	var withdrawal withdrawals.Withdrawal
 	err := s.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		if err := s.users.WithdrawPoints(txCtx, userID, sum); err != nil {
 			log.Warn().
@@ -47,7 +57,7 @@ func (s Service) RequestWithdrawal(
 				Msg("Unable to withdraw requested sum from user balance")
 			return err
 		}
-		w, err := s.withdrawals.Add(txCtx, models.NewCandidateWithdrawal(number, userID, sum))
+		w, err := s.withdrawals.Add(txCtx, withdrawals.New(number, userID, sum))
 		if err != nil {
 			log.Error().
 				Err(err).Str("order", w.Number).Int("userID", userID).
@@ -66,6 +76,6 @@ func (s Service) RequestWithdrawal(
 }
 
 // GetUserWithdrawals returns all successful withdrawals requested by the specified user
-func (s Service) GetUserWithdrawals(ctx context.Context, userID int) ([]models.Withdrawal, error) {
+func (s Service) GetUserWithdrawals(ctx context.Context, userID int) ([]withdrawals.Withdrawal, error) {
 	return s.withdrawals.GetListForUser(ctx, userID)
 }

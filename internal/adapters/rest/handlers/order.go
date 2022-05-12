@@ -11,7 +11,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest/middleware/auth"
-	"github.com/sergeii/practikum-go-gophermart/internal/models"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
+	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/order"
 	"github.com/sergeii/practikum-go-gophermart/pkg/encode"
@@ -20,7 +21,7 @@ import (
 type UploadOrderResp struct {
 	ID         int                `json:"id"`
 	Number     string             `json:"number"`
-	Status     models.OrderStatus `json:"status"`
+	Status     orders.OrderStatus `json:"status"`
 	UploadedAt time.Time          `json:"uploaded_at"` // nolint: tagliatelle
 }
 
@@ -55,7 +56,7 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 		return
 	}
 
-	user := c.MustGet(auth.ContextKey).(models.User) // nolint: forcetypeassert
+	user := c.MustGet(auth.ContextKey).(users.User) // nolint: forcetypeassert
 	o, err := h.app.OrderService.SubmitNewOrder(c.Request.Context(), orderNumber, user.ID)
 	if err != nil {
 		log.Warn().
@@ -84,13 +85,13 @@ func (h *Handler) UploadOrder(c *gin.Context) {
 
 type ListOrderRespItem struct {
 	Number     string             `json:"number"`
-	Status     models.OrderStatus `json:"status"`
+	Status     orders.OrderStatus `json:"status"`
 	Accrual    float64            `json:"accrual"`
 	UploadedAt time.Time          `json:"uploaded_at"` // nolint: tagliatelle
 }
 
 func (h *Handler) ListUserOrders(c *gin.Context) {
-	user := c.MustGet(auth.ContextKey).(models.User) // nolint: forcetypeassert
+	user := c.MustGet(auth.ContextKey).(users.User) // nolint: forcetypeassert
 	orders, err := h.app.OrderService.GetUserOrders(c.Request.Context(), user.ID)
 	if err != nil {
 		log.Warn().
