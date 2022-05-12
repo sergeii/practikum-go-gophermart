@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	testutils2 "github.com/sergeii/practikum-go-gophermart/internal/testutils"
+	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
 )
 
 type requestWithdrawalReqSchema struct {
@@ -37,7 +37,7 @@ type listWithdrawalItemSchema struct {
 
 func TestHandler_RequestWithdrawal_OK(t *testing.T) {
 	ctx := context.TODO()
-	ts, app, cancel := testutils2.PrepareTestServer()
+	ts, app, cancel := testutils.PrepareTestServer()
 	defer cancel()
 
 	before := time.Now()
@@ -54,11 +54,11 @@ func TestHandler_RequestWithdrawal_OK(t *testing.T) {
 
 	for _, item := range withdrawals {
 		var respJSON requestWithdrawalRespSchema
-		resp, _ := testutils2.DoTestRequest(
+		resp, _ := testutils.DoTestRequest(
 			ts, http.MethodPost, "/api/user/balance/withdraw",
-			testutils2.JSONReader(requestWithdrawalReqSchema{item.order, item.sum}),
-			testutils2.WithUser(u, app),
-			testutils2.MustBindJSON(&respJSON),
+			testutils.JSONReader(requestWithdrawalReqSchema{item.order, item.sum}),
+			testutils.WithUser(u, app),
+			testutils.MustBindJSON(&respJSON),
 		)
 		resp.Body.Close()
 		assert.Equal(t, 200, resp.StatusCode)
@@ -141,7 +141,7 @@ func TestHandler_RequestWithdrawal_Validation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.number, func(t *testing.T) {
 			ctx := context.TODO()
-			ts, app, cancel := testutils2.PrepareTestServer()
+			ts, app, cancel := testutils.PrepareTestServer()
 			defer cancel()
 
 			hundred := decimal.RequireFromString("100")
@@ -157,11 +157,11 @@ func TestHandler_RequestWithdrawal_Validation(t *testing.T) {
 			require.NoError(t, err)
 
 			var respJSON requestWithdrawalRespSchema
-			resp, _ := testutils2.DoTestRequest(
+			resp, _ := testutils.DoTestRequest(
 				ts, http.MethodPost, "/api/user/balance/withdraw",
-				testutils2.JSONReader(requestWithdrawalReqSchema{tt.number, tt.sum}),
-				testutils2.WithUser(u, app),
-				testutils2.MustBindJSON(&respJSON),
+				testutils.JSONReader(requestWithdrawalReqSchema{tt.number, tt.sum}),
+				testutils.WithUser(u, app),
+				testutils.MustBindJSON(&respJSON),
 			)
 			resp.Body.Close()
 			balance, _ := app.UserService.GetBalance(ctx, u.ID)
@@ -186,7 +186,7 @@ func TestHandler_RequestWithdrawal_Validation(t *testing.T) {
 
 func TestHandler_RequestWithdrawal_NotEnoughPointsRace(t *testing.T) {
 	ctx := context.TODO()
-	ts, app, cancel := testutils2.PrepareTestServer()
+	ts, app, cancel := testutils.PrepareTestServer()
 	defer cancel()
 
 	u, _ := app.UserService.RegisterNewUser(ctx, "shopper", "secret")
@@ -199,11 +199,11 @@ func TestHandler_RequestWithdrawal_NotEnoughPointsRace(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			var respJSON requestWithdrawalRespSchema
-			resp, _ := testutils2.DoTestRequest(
+			resp, _ := testutils.DoTestRequest(
 				ts, http.MethodPost, "/api/user/balance/withdraw",
-				testutils2.JSONReader(requestWithdrawalReqSchema{testutils2.NewLuhnNumber(16), 3.5}),
-				testutils2.WithUser(u, app),
-				testutils2.MustBindJSON(&respJSON),
+				testutils.JSONReader(requestWithdrawalReqSchema{testutils.NewLuhnNumber(16), 3.5}),
+				testutils.WithUser(u, app),
+				testutils.MustBindJSON(&respJSON),
 			)
 			resp.Body.Close()
 			if resp.StatusCode != 200 {
@@ -264,18 +264,18 @@ func TestHandler_RequestWithdrawal_LuhnValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.number, func(t *testing.T) {
 			ctx := context.TODO()
-			ts, app, cancel := testutils2.PrepareTestServer()
+			ts, app, cancel := testutils.PrepareTestServer()
 			defer cancel()
 			u, _ := app.UserService.RegisterNewUser(ctx, "shopper", "secret")
 			err := app.UserService.AccruePoints(ctx, u.ID, decimal.RequireFromString("100"))
 			require.NoError(t, err)
 
 			var respJSON requestWithdrawalRespSchema
-			resp, _ := testutils2.DoTestRequest(
+			resp, _ := testutils.DoTestRequest(
 				ts, http.MethodPost, "/api/user/balance/withdraw",
-				testutils2.JSONReader(requestWithdrawalReqSchema{tt.number, 1}),
-				testutils2.WithUser(u, app),
-				testutils2.MustBindJSON(&respJSON),
+				testutils.JSONReader(requestWithdrawalReqSchema{tt.number, 1}),
+				testutils.WithUser(u, app),
+				testutils.MustBindJSON(&respJSON),
 			)
 			resp.Body.Close()
 			balance, _ := app.UserService.GetBalance(ctx, u.ID)
@@ -293,17 +293,17 @@ func TestHandler_RequestWithdrawal_LuhnValidation(t *testing.T) {
 }
 
 func TestHandler_RequestWithdrawal_RequiresAuth(t *testing.T) {
-	ts, _, cancel := testutils2.PrepareTestServer()
+	ts, _, cancel := testutils.PrepareTestServer()
 	defer cancel()
 
-	resp, _ := testutils2.DoTestRequest(ts, http.MethodPost, "/api/user/balance/withdraw", nil)
+	resp, _ := testutils.DoTestRequest(ts, http.MethodPost, "/api/user/balance/withdraw", nil)
 	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }
 
 func TestHandler_ListUserWithdrawals_OK(t *testing.T) {
 	ctx := context.TODO()
-	ts, app, cancel := testutils2.PrepareTestServer()
+	ts, app, cancel := testutils.PrepareTestServer()
 	defer cancel()
 
 	u, _ := app.UserService.RegisterNewUser(ctx, "shopper", "secret")
@@ -316,10 +316,10 @@ func TestHandler_ListUserWithdrawals_OK(t *testing.T) {
 	app.WithdrawalService.RequestWithdrawal(ctx, "2538566283278270", u.ID, decimal.NewFromFloat(2.1)) // nolint:errcheck
 
 	uItems := make([]listWithdrawalItemSchema, 0)
-	resp, _ := testutils2.DoTestRequest(
+	resp, _ := testutils.DoTestRequest(
 		ts, http.MethodGet, "/api/user/balance/withdrawals", nil,
-		testutils2.WithUser(u, app),
-		testutils2.MustBindJSON(&uItems),
+		testutils.WithUser(u, app),
+		testutils.MustBindJSON(&uItems),
 	)
 	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
@@ -330,10 +330,10 @@ func TestHandler_ListUserWithdrawals_OK(t *testing.T) {
 	assert.Equal(t, 2.1, uItems[1].Sum)
 
 	oItems := make([]listWithdrawalItemSchema, 0)
-	resp, _ = testutils2.DoTestRequest(
+	resp, _ = testutils.DoTestRequest(
 		ts, http.MethodGet, "/api/user/balance/withdrawals", nil,
-		testutils2.WithUser(other, app),
-		testutils2.MustBindJSON(&oItems),
+		testutils.WithUser(other, app),
+		testutils.MustBindJSON(&oItems),
 	)
 	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
@@ -343,23 +343,23 @@ func TestHandler_ListUserWithdrawals_OK(t *testing.T) {
 }
 
 func TestHandler_ListUserWithdrawals_NoWithdrawalsForUser(t *testing.T) {
-	ts, app, cancel := testutils2.PrepareTestServer()
+	ts, app, cancel := testutils.PrepareTestServer()
 	defer cancel()
 
 	u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
 
-	resp, _ := testutils2.DoTestRequest(
+	resp, _ := testutils.DoTestRequest(
 		ts, http.MethodGet, "/api/user/balance/withdrawals", nil,
-		testutils2.WithUser(u, app),
+		testutils.WithUser(u, app),
 	)
 	resp.Body.Close()
 	assert.Equal(t, 204, resp.StatusCode)
 }
 
 func TestHandler_ListUserWithdrawals_RequiresAuth(t *testing.T) {
-	ts, _, cancel := testutils2.PrepareTestServer()
+	ts, _, cancel := testutils.PrepareTestServer()
 	defer cancel()
-	resp, _ := testutils2.DoTestRequest(ts, http.MethodGet, "/api/user/balance/withdrawals", nil)
+	resp, _ := testutils.DoTestRequest(ts, http.MethodGet, "/api/user/balance/withdrawals", nil)
 	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }

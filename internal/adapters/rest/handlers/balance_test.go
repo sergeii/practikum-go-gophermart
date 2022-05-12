@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	testutils2 "github.com/sergeii/practikum-go-gophermart/internal/testutils"
+	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
 	"github.com/sergeii/practikum-go-gophermart/pkg/encode"
 )
 
@@ -46,7 +46,7 @@ func TestHandler_ShowUserBalance_OK(t *testing.T) {
 			withdrawn := decimal.RequireFromString(tt.withdrawn)
 			accrued := current.Add(withdrawn)
 
-			ts, app, cancel := testutils2.PrepareTestServer()
+			ts, app, cancel := testutils.PrepareTestServer()
 			defer cancel()
 
 			u, _ := app.UserService.RegisterNewUser(context.TODO(), "shopper", "secret")
@@ -60,10 +60,10 @@ func TestHandler_ShowUserBalance_OK(t *testing.T) {
 			}
 
 			var respJSON showBalanceRespSchema
-			resp, _ := testutils2.DoTestRequest(
+			resp, _ := testutils.DoTestRequest(
 				ts, http.MethodGet, "/api/user/balance", nil,
-				testutils2.WithUser(u, app),
-				testutils2.MustBindJSON(&respJSON),
+				testutils.WithUser(u, app),
+				testutils.MustBindJSON(&respJSON),
 			)
 			resp.Body.Close()
 			require.Equal(t, 200, resp.StatusCode)
@@ -74,9 +74,9 @@ func TestHandler_ShowUserBalance_OK(t *testing.T) {
 }
 
 func TestHandler_ShowUserBalance_RequiresAuth(t *testing.T) {
-	ts, _, cancel := testutils2.PrepareTestServer()
+	ts, _, cancel := testutils.PrepareTestServer()
 	defer cancel()
-	resp, _ := testutils2.DoTestRequest(ts, http.MethodGet, "/api/user/balance", nil)
+	resp, _ := testutils.DoTestRequest(ts, http.MethodGet, "/api/user/balance", nil)
 	resp.Body.Close()
 	assert.Equal(t, 401, resp.StatusCode)
 }
