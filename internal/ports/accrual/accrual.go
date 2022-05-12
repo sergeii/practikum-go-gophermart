@@ -13,7 +13,8 @@ import (
 )
 
 type Service struct {
-	url url.URL
+	url    url.URL
+	client *resty.Client
 }
 
 type OrderStatus struct {
@@ -31,7 +32,8 @@ func New(address string) (Service, error) {
 		return Service{}, err
 	}
 	return Service{
-		url: *u,
+		url:    *u,
+		client: resty.New(),
 	}, nil
 }
 
@@ -66,8 +68,7 @@ func (s Service) CheckOrder(number string) (OrderStatus, error) {
 func (s Service) prepareRequest(uri string, args ...interface{}) (*resty.Request, string) {
 	endpoint := s.url
 	endpoint.Path = fmt.Sprintf(uri, args...)
-	client := resty.New()
-	req := client.R().
+	req := s.client.R().
 		SetHeader("Accept", "application/json").
 		SetHeader("Content-Type", "application/json")
 	return req, endpoint.String()

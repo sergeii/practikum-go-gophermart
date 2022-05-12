@@ -1,4 +1,4 @@
-package hasher
+package bcrypt
 
 import (
 	"errors"
@@ -6,14 +6,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type BcryptPasswordHasher struct{}
+type Hasher struct{}
 
-func NewBcryptPasswordHasher() BcryptPasswordHasher {
-	return BcryptPasswordHasher{}
+func New() Hasher {
+	return Hasher{}
 }
 
 // Hash hashes a plaintext password using the Go's bcrypt package with the default cost
-func (h BcryptPasswordHasher) Hash(plainPassword string) (string, error) {
+func (h Hasher) Hash(plainPassword string) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(plainPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err
@@ -23,12 +23,12 @@ func (h BcryptPasswordHasher) Hash(plainPassword string) (string, error) {
 
 // Check compares a plaintext password with its possible hashed equivalent
 // Returns the result of the comparison
-func (h BcryptPasswordHasher) Check(plainPassword, hashedPassword string) (bool, error) {
+func (h Hasher) Check(plainPassword, hashedPassword string) (bool, error) {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(plainPassword))
+	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		return false, nil
+	}
 	if err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return false, nil
-		}
 		return false, err
 	}
 	return true, nil

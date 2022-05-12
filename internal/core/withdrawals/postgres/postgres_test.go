@@ -1,4 +1,4 @@
-package db_test
+package postgres_test
 
 import (
 	"context"
@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
+	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
 	"github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals"
-	wdb "github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals/db"
+	wdb "github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals/postgres"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
-	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
+	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
 )
 
 func TestWithdrawalsDatabase_Add_OK(t *testing.T) {

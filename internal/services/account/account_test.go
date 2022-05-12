@@ -6,12 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
+	xbcrypt "golang.org/x/crypto/bcrypt"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
-	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
-	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
+	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/account"
+	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
+	"github.com/sergeii/practikum-go-gophermart/pkg/security/hasher/bcrypt"
 )
 
 func TestAccountService_RegisterNewUser_OK(t *testing.T) {
@@ -19,7 +20,7 @@ func TestAccountService_RegisterNewUser_OK(t *testing.T) {
 	defer cancel()
 
 	repo := udb.New(db)
-	svc := account.New(repo, account.WithBcryptPasswordHasher())
+	svc := account.New(repo, bcrypt.New())
 
 	u, err := svc.RegisterNewUser(context.TODO(), "happy_customer", "sup3rS3cr3t")
 	require.NoError(t, err)
@@ -28,11 +29,11 @@ func TestAccountService_RegisterNewUser_OK(t *testing.T) {
 	assert.Equal(t, "$2a$10", u.Password[:6]) // password is hashed
 
 	u, _ = repo.GetByID(context.TODO(), u.ID)
-	checkOK := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte("sup3rS3cr3t"))
+	checkOK := xbcrypt.CompareHashAndPassword([]byte(u.Password), []byte("sup3rS3cr3t"))
 	assert.NoError(t, checkOK)
 
-	checkWrong := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte("maybesecret"))
-	assert.ErrorIs(t, checkWrong, bcrypt.ErrMismatchedHashAndPassword)
+	checkWrong := xbcrypt.CompareHashAndPassword([]byte(u.Password), []byte("maybesecret"))
+	assert.ErrorIs(t, checkWrong, xbcrypt.ErrMismatchedHashAndPassword)
 }
 
 func TestAccountService_RegisterNewUser_Errors(t *testing.T) {
@@ -73,7 +74,7 @@ func TestAccountService_RegisterNewUser_Errors(t *testing.T) {
 			defer cancel()
 
 			repo := udb.New(db)
-			svc := account.New(repo, account.WithBcryptPasswordHasher())
+			svc := account.New(repo, bcrypt.New())
 
 			_, err := svc.RegisterNewUser(context.TODO(), "happy_customer", "sup3rS3cr3t")
 			require.NoError(t, err)
@@ -100,7 +101,7 @@ func TestAccountService_Authenticate_OK(t *testing.T) {
 	defer cancel()
 
 	repo := udb.New(db)
-	svc := account.New(repo, account.WithBcryptPasswordHasher())
+	svc := account.New(repo, bcrypt.New())
 
 	u1, err := svc.RegisterNewUser(context.TODO(), "happy_customer", "sup3rS3cr3t")
 	require.NoError(t, err)
@@ -152,7 +153,7 @@ func TestAccountService_Authenticate_Errors(t *testing.T) {
 			defer cancel()
 
 			repo := udb.New(db)
-			svc := account.New(repo, account.WithBcryptPasswordHasher())
+			svc := account.New(repo, bcrypt.New())
 			r, err := svc.RegisterNewUser(context.TODO(), "shopper", "sup3rS3cr3t")
 			require.NoError(t, err)
 

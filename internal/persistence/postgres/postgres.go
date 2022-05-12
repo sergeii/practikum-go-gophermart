@@ -1,4 +1,4 @@
-package db
+package postgres
 
 import (
 	"context"
@@ -24,7 +24,7 @@ func New(pg *pgxpool.Pool) *Database {
 	}
 }
 
-func (db *Database) ExecContext(ctx context.Context) pgxtype.Querier {
+func (db *Database) Conn(ctx context.Context) pgxtype.Querier {
 	if tx := extractTx(ctx); tx != nil {
 		return tx
 	}
@@ -65,6 +65,10 @@ func (db *Database) WithTransaction(ctx context.Context, txFunc func(ctx context
 		return errCommit
 	}
 	return nil
+}
+
+func (db *Database) Close() {
+	db.conn.Close()
 }
 
 func injectTx(ctx context.Context, tx pgx.Tx) context.Context {

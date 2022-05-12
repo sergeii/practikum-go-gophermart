@@ -13,11 +13,11 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/sergeii/practikum-go-gophermart/db/migrations"
-	"github.com/sergeii/practikum-go-gophermart/internal/persistence/db"
+	"github.com/sergeii/practikum-go-gophermart/internal/persistence/postgres"
 	"github.com/sergeii/practikum-go-gophermart/pkg/random"
 )
 
-func PrepareTestDatabase() (*pgxpool.Pool, *db.Database, func()) {
+func PrepareTestDatabase() (*pgxpool.Pool, *postgres.Database, func()) {
 	type config struct {
 		DatabaseDSN string `env:"DATABASE_URI" envDefault:"postgresql://gophermart@localhost:5432/gophermart"`
 	}
@@ -58,7 +58,7 @@ func PrepareTestDatabase() (*pgxpool.Pool, *db.Database, func()) {
 		panic(err)
 	}
 
-	return pool, db.New(pool), func() {
+	return pool, postgres.New(pool), func() {
 		defer pool.Close()
 		defer pg.Close(context.TODO())
 		if _, err := pg.Exec(context.TODO(), fmt.Sprintf("DROP SCHEMA %s CASCADE", schema)); err != nil {

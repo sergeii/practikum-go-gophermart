@@ -1,4 +1,4 @@
-package db
+package postgres
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
-	"github.com/sergeii/practikum-go-gophermart/internal/persistence/db"
+	"github.com/sergeii/practikum-go-gophermart/internal/persistence/postgres"
 )
 
 type withdrawalRow struct {
@@ -21,15 +21,15 @@ type withdrawalRow struct {
 }
 
 type Repository struct {
-	db *db.Database
+	db *postgres.Database
 }
 
-func New(db *db.Database) Repository {
+func New(db *postgres.Database) Repository {
 	return Repository{db}
 }
 
 func (r Repository) Add(ctx context.Context, cw models.Withdrawal) (models.Withdrawal, error) {
-	conn := r.db.ExecContext(ctx)
+	conn := r.db.Conn(ctx)
 	// check whether a withdrawal with the same number has already been registered
 	var exists bool
 	err := conn.
@@ -74,7 +74,8 @@ func (r Repository) Add(ctx context.Context, cw models.Withdrawal) (models.Withd
 }
 
 func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Withdrawal, error) {
-	rows, err := r.db.ExecContext(ctx).Query(
+	var items []models.Withdrawal
+	rows, err := r.db.Conn(ctx).Query(
 		ctx,
 		"SELECT id, processed_at, sum, number, user_id FROM withdrawals "+
 			"WHERE user_id = $1 ORDER BY processed_at ASC",
@@ -86,7 +87,6 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Wi
 	}
 	defer rows.Close()
 
-	items := make([]models.Withdrawal, 0)
 	for rows.Next() {
 		row := withdrawalRow{}
 		err = rows.Scan(&row.ID, &row.ProcessedAt, &row.Sum, &row.Number, &row.UserID)

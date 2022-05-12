@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	appcfg "github.com/sergeii/practikum-go-gophermart/cmd/gophermart/application"
+	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/bootstrap"
 	"github.com/sergeii/practikum-go-gophermart/cmd/gophermart/config"
 	"github.com/sergeii/practikum-go-gophermart/internal/adapters/rest"
 	"github.com/sergeii/practikum-go-gophermart/internal/application"
@@ -27,8 +27,8 @@ func PrepareTestServer(opts ...TestServerOpt) (*httptest.Server, *application.Ap
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	pg, _, cancelDatabase := PrepareTestDatabase()
-	app, err := appcfg.Configure(cfg, pg)
+	_, db, cancelDatabase := PrepareTestDatabase()
+	app, err := bootstrap.App(cfg, db)
 	if err != nil {
 		panic(err)
 	}

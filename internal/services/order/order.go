@@ -13,7 +13,6 @@ import (
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/accrual"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue"
-	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue/memory"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/transactor"
 )
 
@@ -28,8 +27,6 @@ const (
 	PostProcessWaitOnEmptyQueue  = time.Second
 )
 
-type Option func(s *Service)
-
 type Service struct {
 	orders         orders.Repository
 	users          users.Repository
@@ -38,41 +35,20 @@ type Service struct {
 	AccrualService accrual.Service
 }
 
-func WithTransactor(t transactor.Transactor) Option {
-	return func(s *Service) {
-		s.transactor = t
+func New(
+	orders orders.Repository,
+	users users.Repository,
+	transactor transactor.Transactor,
+	processing queue.Repository,
+	accrual accrual.Service,
+) Service {
+	return Service{
+		orders:         orders,
+		users:          users,
+		transactor:     transactor,
+		processing:     processing,
+		AccrualService: accrual,
 	}
-}
-
-func WithAccrualService(as accrual.Service) Option {
-	return func(s *Service) {
-		s.AccrualService = as
-	}
-}
-
-func WithQueueRepository(r queue.Repository) Option {
-	return func(s *Service) {
-		s.processing = r
-	}
-}
-
-func WithInMemoryQueue(size int) Option {
-	repo, err := memory.New(size)
-	if err != nil {
-		panic(err)
-	}
-	return WithQueueRepository(repo)
-}
-
-func New(orders orders.Repository, users users.Repository, opts ...Option) Service {
-	s := Service{
-		orders: orders,
-		users:  users,
-	}
-	for _, opt := range opts {
-		opt(&s)
-	}
-	return s
 }
 
 // SubmitNewOrder creates a new order and attempts to add the new order to the processing queue.

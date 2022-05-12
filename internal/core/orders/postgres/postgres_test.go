@@ -1,4 +1,4 @@
-package db_test
+package postgres_test
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
-	odb "github.com/sergeii/practikum-go-gophermart/internal/core/orders/db"
-	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
+	odb "github.com/sergeii/practikum-go-gophermart/internal/core/orders/postgres"
+	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
-	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
+	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
 )
 
 func TestOrdersDatabase_Add_OK(t *testing.T) {

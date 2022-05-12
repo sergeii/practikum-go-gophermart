@@ -1,4 +1,4 @@
-package db
+package postgres
 
 import (
 	"context"
@@ -11,14 +11,14 @@ import (
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/users"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
-	"github.com/sergeii/practikum-go-gophermart/internal/persistence/db"
+	"github.com/sergeii/practikum-go-gophermart/internal/persistence/postgres"
 )
 
 type Repository struct {
-	db *db.Database
+	db *postgres.Database
 }
 
-func New(db *db.Database) Repository {
+func New(db *postgres.Database) Repository {
 	return Repository{db}
 }
 
@@ -29,7 +29,7 @@ func New(db *db.Database) Repository {
 // Attempts to create a user with duplicate login would end with a user.ErrLoginIsAlreadyUsed error
 // which must be handled by the calling code
 func (r Repository) Create(ctx context.Context, u models.User) (models.User, error) {
-	conn := r.db.ExecContext(ctx)
+	conn := r.db.Conn(ctx)
 	// force login to lower case
 	login := strings.ToLower(u.Login)
 
@@ -65,8 +65,7 @@ func (r Repository) Create(ctx context.Context, u models.User) (models.User, err
 // Returns a models.User instance for the found user, or an error in case of a missing user with the given ID
 func (r Repository) GetByID(ctx context.Context, id int) (models.User, error) {
 	var user models.User
-
-	row := r.db.ExecContext(ctx).QueryRow(
+	row := r.db.Conn(ctx).QueryRow(
 		ctx,
 		"SELECT id, login, password, balance_current, balance_withdrawn FROM users WHERE id = $1",
 		id,
@@ -90,8 +89,7 @@ func (r Repository) GetByID(ctx context.Context, id int) (models.User, error) {
 // Just like its neighbour GetByID returns a models.User instance for the found user
 func (r Repository) GetByLogin(ctx context.Context, login string) (models.User, error) {
 	var user models.User
-
-	row := r.db.ExecContext(ctx).QueryRow(
+	row := r.db.Conn(ctx).QueryRow(
 		ctx,
 		"SELECT id, login, password, balance_current, balance_withdrawn FROM users WHERE lower(login) = $1",
 		strings.ToLower(login),
@@ -115,7 +113,7 @@ func (r Repository) GetByLogin(ctx context.Context, login string) (models.User, 
 func (r Repository) AccruePoints(ctx context.Context, userID int, points decimal.Decimal) error {
 	return r.db.WithTransaction(ctx, func(txCtx context.Context) error {
 		var oldCurrent, newCurrent decimal.Decimal
-		tx := r.db.ExecContext(txCtx)
+		tx := r.db.Conn(txCtx)
 		if err := tx.QueryRow(
 			txCtx, "SELECT balance_current FROM users WHERE id = $1 FOR UPDATE", userID,
 		).Scan(&oldCurrent); err != nil {
@@ -143,9 +141,13 @@ func (r Repository) AccruePoints(ctx context.Context, userID int, points decimal
 // incrementing the amount of withdrawn points and deducting the amount of current points.
 // Since you cannot withdraw more than you have, an error is returned if such an attempt is made
 func (r Repository) WithdrawPoints(ctx context.Context, userID int, points decimal.Decimal) error {
+	// cannot withdraw negative sums
+	if points.LessThanOrEqual(decimal.Zero) {
+		return users.ErrUserCantWithdrawNegativeSum
+	}
 	return r.db.WithTransaction(ctx, func(txCtx context.Context) error {
 		var oldCurrent, newCurrent, oldWithdrawn, newWithdrawn decimal.Decimal
-		tx := r.db.ExecContext(txCtx)
+		tx := r.db.Conn(txCtx)
 		if err := tx.QueryRow(
 			txCtx,
 			"SELECT balance_current, balance_withdrawn FROM users WHERE id = $1 FOR UPDATE",
@@ -157,10 +159,6 @@ func (r Repository) WithdrawPoints(ctx context.Context, userID int, points decim
 		// cannot withdraw more points than the user owns
 		if oldCurrent.LessThan(points) {
 			return users.ErrUserHasInsufficientAccrual
-		}
-		// cannot withdraw negative sums
-		if points.LessThanOrEqual(decimal.Zero) {
-			return users.ErrUserCantWithdrawNegativeSum
 		}
 		if err := tx.QueryRow(
 			txCtx,

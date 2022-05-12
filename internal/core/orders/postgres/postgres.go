@@ -1,4 +1,4 @@
-package db
+package postgres
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/sergeii/practikum-go-gophermart/internal/core/orders"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
-	"github.com/sergeii/practikum-go-gophermart/internal/persistence/db"
+	"github.com/sergeii/practikum-go-gophermart/internal/persistence/postgres"
 )
 
 type orderRow struct {
@@ -24,10 +24,10 @@ type orderRow struct {
 }
 
 type Repository struct {
-	db *db.Database
+	db *postgres.Database
 }
 
-func New(db *db.Database) Repository {
+func New(db *postgres.Database) Repository {
 	return Repository{db}
 }
 
@@ -35,12 +35,11 @@ func New(db *db.Database) Repository {
 // A new order cannot be added in case of another order having the same number.
 // In that case an error is returned
 func (r Repository) Add(ctx context.Context, co models.Order) (models.Order, error) {
-	conn := r.db.ExecContext(ctx)
-
+	conn := r.db.Conn(ctx)
 	// check whether an order with the same number has already been uploaded
 	var exists bool
 	err := conn.
-		QueryRow(ctx, "SELECT EXISTS(SELECT id FROM orders WHERE number=$1)", co.Number).
+		QueryRow(ctx, "SELECT EXISTS(SELECT id FROM orders WHERE number = $1)", co.Number).
 		Scan(&exists)
 	if err != nil {
 		return models.Order{}, err
@@ -78,7 +77,7 @@ func (r Repository) Add(ctx context.Context, co models.Order) (models.Order, err
 // GetByNumber attempts to find and return an order by its external number
 func (r Repository) GetByNumber(ctx context.Context, number string) (models.Order, error) {
 	var row orderRow
-	result := r.db.ExecContext(ctx).QueryRow(
+	result := r.db.Conn(ctx).QueryRow(
 		ctx,
 		"SELECT id, user_id, uploaded_at, status, accrual FROM orders WHERE number = $1",
 		number,
@@ -98,7 +97,8 @@ func (r Repository) GetByNumber(ctx context.Context, number string) (models.Orde
 // GetListForUser returns a list of orders uploaded by specified user.
 // The orders are sorted from the oldest to the newest
 func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Order, error) {
-	rows, err := r.db.ExecContext(ctx).Query(
+	var items []models.Order
+	rows, err := r.db.Conn(ctx).Query(
 		ctx,
 		"SELECT id, uploaded_at, status, accrual, number, user_id FROM orders "+
 			"WHERE user_id = $1 ORDER BY uploaded_at ASC",
@@ -110,7 +110,6 @@ func (r Repository) GetListForUser(ctx context.Context, userID int) ([]models.Or
 	}
 	defer rows.Close()
 
-	items := make([]models.Order, 0)
 	for rows.Next() {
 		row := orderRow{}
 		err = rows.Scan(&row.ID, &row.UploadedAt, &row.Status, &row.Accrual, &row.Number, &row.UserID)
@@ -136,7 +135,7 @@ func (r Repository) UpdateStatus(
 	ctx context.Context, orderID int, status models.OrderStatus, accrual decimal.Decimal,
 ) error {
 	return r.db.WithTransaction(ctx, func(txCtx context.Context) error {
-		tx := r.db.ExecContext(txCtx)
+		tx := r.db.Conn(txCtx)
 		// ensure that we update the order exclusively
 		if _, err := tx.Exec(txCtx, "SELECT 1 FROM orders WHERE id = $1 FOR UPDATE NOWAIT", orderID); err != nil {
 			log.Error().Err(err).Int("orderID", orderID).Msg("Unable to acquire row lock for order")

@@ -1,4 +1,4 @@
-package processing
+package run
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 
 var ErrProcessingInterrupted = errors.New("processing is interrupted")
 
-func Run(ctx context.Context, app *application.App, wg *sync.WaitGroup, failure chan error) {
+func Processing(ctx context.Context, app *application.App, wg *sync.WaitGroup, failure chan error) {
 	defer wg.Done()
 	wait := time.After(time.Millisecond)
 	for {

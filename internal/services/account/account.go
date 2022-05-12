@@ -21,28 +21,11 @@ type Service struct {
 	hasher hasher.PasswordHasher
 }
 
-type Option func(s *Service)
-
-func WithPasswordHasher(h hasher.PasswordHasher) Option {
-	return func(s *Service) {
-		s.hasher = h
+func New(repo users.Repository, ph hasher.PasswordHasher) Service {
+	return Service{
+		users:  repo,
+		hasher: ph,
 	}
-}
-
-func WithBcryptPasswordHasher() Option {
-	return WithPasswordHasher(hasher.NewBcryptPasswordHasher())
-}
-
-func New(users users.Repository, opts ...Option) Service {
-	s := Service{
-		users: users,
-		// set defaults
-		hasher: hasher.NewNoopPasswordHasher(),
-	}
-	for _, opt := range opts {
-		opt(&s)
-	}
-	return s
 }
 
 // RegisterNewUser attempts to register a new user with the current repository.

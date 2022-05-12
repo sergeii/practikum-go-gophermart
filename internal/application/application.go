@@ -14,32 +14,16 @@ type App struct {
 	Cfg               config.Config
 }
 
-type Option func(a *App)
-
-func NewApp(cfg config.Config, opts ...Option) *App {
-	app := &App{
-		Cfg: cfg,
-	}
-	for _, opt := range opts {
-		opt(app)
-	}
-	return app
-}
-
-func WithUserService(s account.Service) Option {
-	return func(a *App) {
-		a.UserService = s
-	}
-}
-
-func WithOrderService(s order.Service) Option {
-	return func(a *App) {
-		a.OrderService = s
-	}
-}
-
-func WithWithdrawalService(s withdrawal.Service) Option {
-	return func(a *App) {
-		a.WithdrawalService = s
+func NewApp(
+	cfg config.Config,
+	userService account.Service,
+	orderService order.Service,
+	withdrawalService withdrawal.Service,
+) *App {
+	return &App{
+		Cfg:               cfg,
+		UserService:       userService,
+		OrderService:      orderService,
+		WithdrawalService: withdrawalService,
 	}
 }

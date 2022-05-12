@@ -1,4 +1,4 @@
-package logging
+package bootstrap
 
 import (
 	"errors"
@@ -15,11 +15,11 @@ import (
 )
 
 var (
-	ErrInvalidLogOutput = errors.New("unknown logging output format")
-	ErrInvalidLogLevel  = errors.New("unknown logging level")
+	ErrLoggingInvalidLogOutput = errors.New("unknown logging output format")
+	ErrLoggingInvalidLogLevel  = errors.New("unknown logging level")
 )
 
-func Configure(cfg config.Config) (zerolog.Logger, error) {
+func Logging(cfg config.Config) (zerolog.Logger, error) {
 	var output io.Writer
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro
 	zerolog.DurationFieldUnit = time.Second
@@ -27,7 +27,7 @@ func Configure(cfg config.Config) (zerolog.Logger, error) {
 
 	lvl, err := zerolog.ParseLevel(cfg.LogLevel)
 	if err != nil {
-		return zerolog.Logger{}, ErrInvalidLogLevel
+		return zerolog.Logger{}, ErrLoggingInvalidLogLevel
 	}
 	zerolog.SetGlobalLevel(lvl)
 	fmt.Fprintf(os.Stderr, "Global logging level is set to %s\n", zerolog.GlobalLevel())
@@ -40,7 +40,7 @@ func Configure(cfg config.Config) (zerolog.Logger, error) {
 	case "json":
 		output = nil
 	default:
-		return zerolog.Logger{}, ErrInvalidLogOutput
+		return zerolog.Logger{}, ErrLoggingInvalidLogOutput
 	}
 
 	logger := log.With().Caller().Logger()

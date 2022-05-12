@@ -10,13 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	urepo "github.com/sergeii/practikum-go-gophermart/internal/core/users"
-	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
+	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
 	wrepo "github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals"
-	wdb "github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals/db"
+	wdb "github.com/sergeii/practikum-go-gophermart/internal/core/withdrawals/postgres"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
-	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
+	"github.com/sergeii/practikum-go-gophermart/internal/ports/transactor"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/withdrawal"
+	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
 )
+
+func newService(withdrawals wrepo.Repository, users urepo.Repository, trans transactor.Transactor) withdrawal.Service {
+	return withdrawal.New(withdrawals, users, trans)
+}
 
 func TestWithdrawalService_RequestWithdrawal_OK(t *testing.T) {
 	ctx := context.TODO()
@@ -33,7 +38,7 @@ func TestWithdrawalService_RequestWithdrawal_OK(t *testing.T) {
 	require.NoError(t, err)
 
 	withdrawals := wdb.New(db)
-	ws := withdrawal.New(withdrawals, users, withdrawal.WithTransactor(db))
+	ws := newService(withdrawals, users, db)
 
 	before := time.Now()
 	w1, err := ws.RequestWithdrawal(ctx, "1234567812345670", u1.ID, decimal.RequireFromString("4.99"))
@@ -86,7 +91,7 @@ func TestWithdrawalService_RequestWithdrawal_Duplicate(t *testing.T) {
 	require.NoError(t, err)
 
 	withdrawals := wdb.New(db)
-	ws := withdrawal.New(withdrawals, users, withdrawal.WithTransactor(db))
+	ws := newService(withdrawals, users, db)
 
 	_, err = ws.RequestWithdrawal(ctx, "1234567812345670", u1.ID, decimal.RequireFromString("4.99"))
 	require.NoError(t, err)
@@ -136,7 +141,7 @@ func TestWithdrawalService_RequestWithdrawal_NegativeSum(t *testing.T) {
 			require.NoError(t, err)
 
 			withdrawals := wdb.New(db)
-			ws := withdrawal.New(withdrawals, users, withdrawal.WithTransactor(db))
+			ws := newService(withdrawals, users, db)
 
 			_, err = ws.RequestWithdrawal(ctx, "1234567812345670", u.ID, decimal.RequireFromString(tt.sum))
 			require.ErrorIs(t, err, urepo.ErrUserCantWithdrawNegativeSum)
@@ -183,7 +188,7 @@ func TestWithdrawalService_RequestWithdrawal_NotEnoughPoints(t *testing.T) {
 			require.NoError(t, err)
 
 			withdrawals := wdb.New(db)
-			ws := withdrawal.New(withdrawals, users, withdrawal.WithTransactor(db))
+			ws := newService(withdrawals, users, db)
 
 			_, err = ws.RequestWithdrawal(
 				ctx, "1234567812345670", u.ID, decimal.RequireFromString("10.00001"),

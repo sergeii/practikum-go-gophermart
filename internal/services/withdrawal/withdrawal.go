@@ -18,23 +18,12 @@ type Service struct {
 	transactor  transactor.Transactor
 }
 
-type Option func(s *Service)
-
-func WithTransactor(t transactor.Transactor) Option {
-	return func(s *Service) {
-		s.transactor = t
-	}
-}
-
-func New(withdrawals withdrawals.Repository, users users.Repository, opts ...Option) Service {
-	s := Service{
+func New(withdrawals withdrawals.Repository, users users.Repository, transactor transactor.Transactor) Service {
+	return Service{
 		withdrawals: withdrawals,
 		users:       users,
+		transactor:  transactor,
 	}
-	for _, opt := range opts {
-		opt(&s)
-	}
-	return s
 }
 
 // RequestWithdrawal attempts to withdraw specified sum from the selected user's account.

@@ -12,15 +12,39 @@ import (
 	"github.com/stretchr/testify/require"
 
 	orepo "github.com/sergeii/practikum-go-gophermart/internal/core/orders"
-	odb "github.com/sergeii/practikum-go-gophermart/internal/core/orders/db"
-	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/db"
+	odb "github.com/sergeii/practikum-go-gophermart/internal/core/orders/postgres"
+	urepo "github.com/sergeii/practikum-go-gophermart/internal/core/users"
+	udb "github.com/sergeii/practikum-go-gophermart/internal/core/users/postgres"
 	"github.com/sergeii/practikum-go-gophermart/internal/models"
-	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/accrual"
 	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue"
+	"github.com/sergeii/practikum-go-gophermart/internal/ports/queue/memory"
+	"github.com/sergeii/practikum-go-gophermart/internal/ports/transactor"
 	"github.com/sergeii/practikum-go-gophermart/internal/services/order"
+	"github.com/sergeii/practikum-go-gophermart/internal/testutils"
 	"github.com/sergeii/practikum-go-gophermart/pkg/encode"
 )
+
+func newService(
+	orders orepo.Repository,
+	users urepo.Repository,
+	trans transactor.Transactor,
+	queueSize int,
+	accrualURL string,
+) order.Service {
+	q, err := memory.New(queueSize)
+	if err != nil {
+		panic(err)
+	}
+	if accrualURL == "" {
+		accrualURL = "http://localhost:8081"
+	}
+	acc, err := accrual.New(accrualURL)
+	if err != nil {
+		panic(err)
+	}
+	return order.New(orders, users, trans, q, acc)
+}
 
 func TestOrderService_SubmitNewOrder_OK(t *testing.T) {
 	_, db, cancel := testutils.PrepareTestDatabase()
@@ -31,7 +55,7 @@ func TestOrderService_SubmitNewOrder_OK(t *testing.T) {
 	require.NoError(t, err)
 
 	orders := odb.New(db)
-	os := order.New(orders, users, order.WithInMemoryQueue(10), order.WithTransactor(db))
+	os := newService(orders, users, db, 10, "")
 
 	before := time.Now()
 	o1, err := os.SubmitNewOrder(context.TODO(), "1234567812345670", u.ID)
@@ -62,7 +86,7 @@ func TestOrderService_SubmitNewOrder_Duplicate(t *testing.T) {
 	user2, _ := users.Create(context.TODO(), models.User{Login: "othercustomer", Password: "secr3t"})
 
 	orders := odb.New(db)
-	os := order.New(orders, users, order.WithInMemoryQueue(10), order.WithTransactor(db))
+	os := newService(orders, users, db, 10, "")
 
 	_, err := os.SubmitNewOrder(context.TODO(), "1234567812345670", user1.ID)
 	require.NoError(t, err)
@@ -87,7 +111,7 @@ func TestOrderService_UpdateOrderStatus_OK(t *testing.T) {
 	u, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 
 	orders := odb.New(db)
-	svc := order.New(orders, users, order.WithInMemoryQueue(10), order.WithTransactor(db))
+	svc := newService(orders, users, db, 10, "")
 
 	o, err := svc.SubmitNewOrder(context.TODO(), "1234567812345670", u.ID)
 	require.NoError(t, err)
@@ -115,7 +139,7 @@ func TestOrderService_UpdateOrderStatus_NotFound(t *testing.T) {
 
 	users := udb.New(db)
 	orders := odb.New(db)
-	svc := order.New(orders, users, order.WithInMemoryQueue(10), order.WithTransactor(db))
+	svc := newService(orders, users, db, 10, "")
 	err := svc.UpdateOrderStatus(
 		context.TODO(), "1234567812345670",
 		models.OrderStatusProcessed, decimal.RequireFromString("100.5"),
@@ -158,7 +182,7 @@ func TestOrderService_UpdateOrderStatus_ConstraintErrors(t *testing.T) {
 			u, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 
 			orders := odb.New(db)
-			svc := order.New(orders, users, order.WithInMemoryQueue(10), order.WithTransactor(db))
+			svc := newService(orders, users, db, 10, "")
 
 			o, err := svc.SubmitNewOrder(context.TODO(), "1234567812345670", u.ID)
 			require.NoError(t, err)
@@ -216,8 +240,6 @@ func TestOrderService_ProcessNextOrder_Loop(t *testing.T) {
 		c.String(r.code, string(r.body))
 	})
 	ts := httptest.NewServer(r)
-	accrualService, err := accrual.New(ts.URL)
-	require.NoError(t, err)
 
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
@@ -227,14 +249,9 @@ func TestOrderService_ProcessNextOrder_Loop(t *testing.T) {
 	user2, _ := users.Create(context.TODO(), models.User{Login: "othercustomer", Password: "secr3t"})
 
 	orders := odb.New(db)
-	os := order.New(
-		orders, users,
-		order.WithInMemoryQueue(4),
-		order.WithAccrualService(accrualService),
-		order.WithTransactor(db),
-	)
+	os := newService(orders, users, db, 4, ts.URL)
 
-	_, err = os.SubmitNewOrder(context.TODO(), "1234567812345670", user1.ID)
+	_, err := os.SubmitNewOrder(context.TODO(), "1234567812345670", user1.ID)
 	assert.NoError(t, err)
 	_, err = os.SubmitNewOrder(context.TODO(), "4561261212345467", user2.ID)
 	assert.NoError(t, err)
@@ -316,8 +333,6 @@ func TestOrderService_ProcessNextOrder_Retry(t *testing.T) {
 		}
 	})
 	ts := httptest.NewServer(r)
-	accrualService, err := accrual.New(ts.URL)
-	require.NoError(t, err)
 
 	_, db, cancel := testutils.PrepareTestDatabase()
 	defer cancel()
@@ -326,14 +341,9 @@ func TestOrderService_ProcessNextOrder_Retry(t *testing.T) {
 	u, _ := users.Create(context.TODO(), models.User{Login: "happycustomer", Password: "str0ng"})
 
 	orders := odb.New(db)
-	os := order.New(
-		orders, users,
-		order.WithInMemoryQueue(3),
-		order.WithAccrualService(accrualService),
-		order.WithTransactor(db),
-	)
+	os := newService(orders, users, db, 3, ts.URL)
 
-	_, err = os.SubmitNewOrder(context.TODO(), "79927398713", u.ID)
+	_, err := os.SubmitNewOrder(context.TODO(), "79927398713", u.ID)
 	assert.NoError(t, err)
 	qLen, _ := os.ProcessingLength(context.TODO())
 	assert.Equal(t, 1, qLen)

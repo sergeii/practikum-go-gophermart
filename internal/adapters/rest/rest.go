@@ -29,7 +29,7 @@ func New(app *application.App) (*gin.Engine, error) {
 
 func registerRoutes(r *gin.Engine, app *application.App) error { // nolint: unparam
 	handler := handlers.New(app)
-	privateRoutes := r.Group("/", auth.RequireAuthentication)
+	privateRoutes := r.Group("/", auth.Authentication(app.Cfg), auth.RequireAuthentication)
 	registerPublicRoutes(r, handler)
 	registerPrivateRoutes(privateRoutes, handler)
 	return nil
@@ -51,7 +51,6 @@ func registerPrivateRoutes(r *gin.RouterGroup, h *handlers.Handler) {
 func registerMiddlewares(router *gin.Engine, app *application.App) error { // nolint: unparam
 	router.Use(gin.LoggerWithWriter(log.Logger))
 	router.Use(gin.Recovery())
-	router.Use(auth.Authentication(app.Cfg))
 	return nil
 }
 

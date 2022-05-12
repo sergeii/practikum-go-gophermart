@@ -38,18 +38,18 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 		strings.TrimSpace(json.Login),
 		strings.TrimSpace(json.Password),
 	)
+	if errors.Is(err, users.ErrUserLoginIsOccupied) {
+		log.Debug().
+			Err(err).Str("path", c.FullPath()).Str("login", json.Login).
+			Msg("Unable to register user due to conflict")
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
 	if err != nil {
-		if errors.Is(err, users.ErrUserLoginIsOccupied) {
-			log.Debug().
-				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
-				Msg("Unable to register user due to conflict")
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		} else {
-			log.Error().
-				Err(err).Str("path", c.FullPath()).Str("login", json.Login).
-				Msg("Unable to register user due to error")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
+		log.Error().
+			Err(err).Str("path", c.FullPath()).Str("login", json.Login).
+			Msg("Unable to register user due to error")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

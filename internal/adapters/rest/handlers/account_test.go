@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sergeii/practikum-go-gophermart/internal/pkg/testutils"
+	testutils2 "github.com/sergeii/practikum-go-gophermart/internal/testutils"
 )
 
 type registerUserReqSchema struct {
@@ -39,14 +39,14 @@ func parseAuthSetCookie(resp *http.Response) *http.Cookie {
 }
 
 func TestHandler_RegisterUser_OK(t *testing.T) {
-	ts, app, cancel := testutils.PrepareTestServer()
+	ts, app, cancel := testutils2.PrepareTestServer()
 	defer cancel()
 
 	var respJSON registerUserRespSchema
-	resp, _ := testutils.DoTestRequest(
+	resp, _ := testutils2.DoTestRequest(
 		ts, http.MethodPost, "/api/user/register",
-		testutils.JSONReader(registerUserReqSchema{Login: "happy_shopper", Password: "secret"}),
-		testutils.MustBindJSON(&respJSON),
+		testutils2.JSONReader(registerUserReqSchema{Login: "happy_shopper", Password: "secret"}),
+		testutils2.MustBindJSON(&respJSON),
 	)
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.True(t, respJSON.Result.ID > 0)
@@ -136,15 +136,15 @@ func TestHandler_RegisterUser_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ts, app, cancel := testutils.PrepareTestServer()
+			ts, app, cancel := testutils2.PrepareTestServer()
 			defer cancel()
 
 			_, err := app.UserService.RegisterNewUser(context.TODO(), "happy_shopper", "super_secret")
 			require.NoError(t, err)
 
-			resp, respBody := testutils.DoTestRequest(
+			resp, respBody := testutils2.DoTestRequest(
 				ts, http.MethodPost, "/api/user/register",
-				testutils.JSONReader(registerUserReqSchema{Login: tt.login, Password: tt.password}),
+				testutils2.JSONReader(registerUserReqSchema{Login: tt.login, Password: tt.password}),
 			)
 			resp.Body.Close()
 			if tt.wantSuccess {
@@ -173,14 +173,14 @@ type loginUserRespErrorSchema struct {
 }
 
 func TestHandler_LoginUser_OK(t *testing.T) {
-	ts, app, cancel := testutils.PrepareTestServer()
+	ts, app, cancel := testutils2.PrepareTestServer()
 	defer cancel()
 
 	u, err := app.UserService.RegisterNewUser(context.TODO(), "happy_shopper", "super_secret")
 	require.NoError(t, err)
 
-	resp, _ := testutils.DoTestRequest(
-		ts, http.MethodPost, "/api/user/login", testutils.JSONReader(
+	resp, _ := testutils2.DoTestRequest(
+		ts, http.MethodPost, "/api/user/login", testutils2.JSONReader(
 			loginUserReqSchema{Login: "happy_shopper", Password: "super_secret"},
 		),
 	)
@@ -272,15 +272,15 @@ func TestHandler_LoginUser_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ts, app, cancel := testutils.PrepareTestServer()
+			ts, app, cancel := testutils2.PrepareTestServer()
 			defer cancel()
 
 			_, err := app.UserService.RegisterNewUser(context.TODO(), "happy_shopper", "super_secret")
 			require.NoError(t, err)
 
-			resp, respBody := testutils.DoTestRequest(
+			resp, respBody := testutils2.DoTestRequest(
 				ts, http.MethodPost, "/api/user/login",
-				testutils.JSONReader(loginUserReqSchema{Login: tt.login, Password: tt.password}),
+				testutils2.JSONReader(loginUserReqSchema{Login: tt.login, Password: tt.password}),
 			)
 			if tt.wantSuccess {
 				assert.Equal(t, 200, resp.StatusCode)

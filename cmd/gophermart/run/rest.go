@@ -1,4 +1,4 @@
-package restapi
+package run
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	httpserver "github.com/sergeii/practikum-go-gophermart/pkg/http/server"
 )
 
-func Run(ctx context.Context, app *application.App, wg *sync.WaitGroup, failure chan error) {
+func RestAPI(ctx context.Context, app *application.App, wg *sync.WaitGroup, failure chan error) {
 	defer wg.Done()
 
 	gin.SetMode(gin.ReleaseMode)
