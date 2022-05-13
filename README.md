@@ -1,8 +1,8 @@
 # gophermart
 
-![CI](https://github.com/sergeii/practikum-go-gophermart/actions/workflows/ci.yml/badge.svg?branch=devel)
-![gophermart](https://github.com/sergeii/practikum-go-gophermart/actions/workflows/gophermart.yml/badge.svg?branch=devel)
-![gophermart](https://github.com/sergeii/practikum-go-gophermart/actions/workflows/statictest.yml/badge.svg?branch=devel)
+[![CI](https://github.com/sergeii/practikum-go-gophermart/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sergeii/practikum-go-gophermart/actions/workflows/ci.yml?query=branch%3Amain)
+[![gophermart](https://github.com/sergeii/practikum-go-gophermart/actions/workflows/gophermart.yml/badge.svg?branch=main)](https://github.com/sergeii/practikum-go-gophermart/actions/workflows/gophermart.yml?query=branch%3Amain)
+[![gophermart](https://github.com/sergeii/practikum-go-gophermart/actions/workflows/statictest.yml/badge.svg?branch=main)](https://github.com/sergeii/practikum-go-gophermart/actions/workflows/statictest.yml?query=branch%3Amain)
 [![codecov](https://codecov.io/gh/sergeii/practikum-go-gophermart/branch/main/graph/badge.svg?token=CLWPqKRRzH)](https://codecov.io/gh/sergeii/practikum-go-gophermart)
 
 ## Сборка проекта
